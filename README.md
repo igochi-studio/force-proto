@@ -1,36 +1,111 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Force · prototype
 
-## Getting Started
+A web prototype of the Force iOS app, built to be opened on a phone and added to the Home Screen.
+Live build: https://force-proto.vercel.app
 
-First, run the development server:
+**Force in one line:** a companion that builds your longitudinal memory and helps you find your perfect side quest partnerships.
+
+## Run it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev          # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open it on a phone (same network, or a tunnel) and use Share → Add to Home Screen; it runs standalone without Safari chrome.
+On a desktop browser it renders inside an iPhone frame.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| URL flag | What it does |
+| --- | --- |
+| `/?onboard=1` | Replays the onboarding (it otherwise runs once; the flag lives in `localStorage` as `force.onboarded`). |
+| `/?demo=new` | Starts with an empty memory, as a first-time person would see it. Default is the Mira persona. |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Checks, all of which must pass before a deploy:
 
-## Learn More
+```bash
+npx tsc --noEmit     # types
+npm run lint         # eslint
+npm run check:words  # banned vocabulary in copy (see package.json)
+npm run build
+```
 
-To learn more about Next.js, take a look at the following resources:
+Deploy (needs access to the Vercel project): `vercel deploy --prod --yes --name force-proto`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## What's in it
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+app/
+  layout.tsx        metadata: share card, icons, manifest, theme colour
+  page.tsx          mounts the app; exposes window.__f (store actions) in dev
+  globals.css       type scale, bars, surfaces, pills
+styles/tokens.css   colour, depth, radius and motion tokens (the whole palette lives here)
+data/
+  mira.ts           the Mira persona: entries (moments), themes, clips, patterns, paintings
+  social.ts         side quests, the people on the energy map, what they disclose and when
+lib/f/
+  store.ts          zustand store: chat, memory, side quests, energy map, threads, settings
+  companion.ts      what Force says back (scripted, see "Real vs simulated")
+  analyse.ts        pattern map + voice read over a set of moments
+  audio.ts          mic recording (real), level metering, clip from file
+  player.ts         one app-wide audio player
+  ripple.ts         WebGL ripple shader used by voice mode
+components/f/
+  App.tsx           page stack, swipe-back, toasts, onboarding gate
+  Companion.tsx     home: the conversation with Force
+  Composer.tsx      the field: + menu, text, hold-to-talk mic
+  Bubbles.tsx       message bubbles, audio bubble, pull-sideways gesture
+  VoiceMode.tsx     hold anywhere → the screen becomes water (snapshot + ripple shader)
+  Memory.tsx        memory: the world, filters, search, side quests, maps, moments
+  Graph3D.tsx       the world: a 3D canvas of moments strung by theme, painted goo
+  EntryView.tsx     a moment: rich text, media blocks, bottom add bar, autosave
+  Quests.tsx        a side quest page; shared row components; `useMyForce`
+  Energy.tsx        energy map: conversations, painted covers, dive page, map, threads with polls
+  Sheet.tsx         the pattern map sheet (mini map, patterns, voice, next moves)
+  Onboarding.tsx    number → code → permissions → connections → three voice questions → tour
+  PaintedMark.tsx   the mark painted in oil pastel (splash)
+  Profile.tsx       you: counts, what Force can use / read, replay, start over
+  Nav.tsx, Face.tsx, Goo.tsx, Calendar.tsx, marks.tsx, ui.tsx   shared pieces
+public/
+  art/              the oil pastel paintings (one per theme) used everywhere colour appears
+  icons/            earlier painted icons (unused in the light version, kept for later)
+  og.png, icon-*.png, apple-touch-icon.png, manifest.webmanifest
+```
 
-## Deploy on Vercel
+## How it fits together
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Home is the conversation.** Force greets, offers a few replies, and everything you say is kept as a *moment* on the side quest it belongs to. There is nothing to save. Hold anywhere on the conversation to talk (voice mode); hold or pull a message sideways to open its pattern map.
+- **Memory (left pill, or swipe right).** The world first (every moment as a drop in its theme's painting, strung to the ones it shares a theme with), filters and search above it, then side quests, pattern maps you've made, and every moment. Tap a drop to see it; Select to pick several; Pattern map runs on whatever is in hand.
+- **Energy map (right pill).** Conversations at the top, then "Your energy lately" as painted covers (tap one to dive into the painting: a side quest for that energy and who shares it), then the map: you, with a strand to each person; shorter strand, nearer energy. Before both say yes, only a first name and the shared side quest are shown. Threads are a group of three: you, them and Force, who posts polls.
+- **Pattern map** is the only analysis. If there's voice in what it's reading, what your voice did appears inside the same map. Next moves can be kept (nudge) or let go by swiping.
+- **Onboarding** ends with three questions answered out loud; those answers become the first moments, and the world grows from them in front of you.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Real vs simulated
+
+| Real | Simulated (and where) |
+| --- | --- |
+| Recording from the mic, level metering, playback | Force's replies: scripted on keywords and the persona's past (`lib/f/companion.ts`) |
+| All gestures, pages, sheets, voice-mode ripple | Pattern maps: counted from the persona's data, not a model (`lib/f/analyse.ts`, `data/mira.ts`) |
+| Entry editing, formatting, media blocks, autosave (in memory for the session) | Speech-to-text: real recordings have no transcript yet |
+| Browser permission prompts (mic, notifications, location) | People, matching, "they said yes", their replies (`data/social.ts`, `store.ts`) |
+| Onboarding flow, `localStorage` flag | Phone number / code: any six digits pass; no SMS |
+| | Calendar / Photos / Notes connections: a timer, no API |
+| | Nudges: kept moves are stored, nothing is scheduled |
+
+Nothing persists between reloads except the onboarded flag. There is no backend.
+
+## Design rules the code follows
+
+- Type: 26 / 20 / 16 / 15 / 13 / 12 (body is 15), the phone's own font; Syne Mono for dates only. At most three sizes per screen.
+- 8pt grid, 16pt side margins, 44pt minimum tap targets, 52pt main pills.
+- Warm greys (`styles/tokens.css`), near-black ink, one accent (blue, state only), soft shadows, no borders.
+- Colour comes from the paintings (`public/art`, `ART_SRC` / `ART_TONE` in `data/mira.ts`), never from generated gradients.
+- Motion only where something physically moves: sheets, pages growing from their pill, drags, the ripple. Content appears, it doesn't animate in.
+- Chat language everywhere: bubbles, white pills, the composer shape. New flows are built from these parts.
+
+## Known limits of a web build
+
+These need a native wrapper (Capacitor is the quickest route) rather than more web work:
+- The ↑ ↓ Done bar above the iOS keyboard is Safari's and cannot be removed.
+- Haptics: `navigator.vibrate` works on Android only.
+- Notifications / nudges, background audio, Contacts, Calendar and Photos access.
+- Voice mode photographs the screen once when you hold; it can't follow a screen that changes while you talk.

@@ -1,0 +1,190 @@
+"use client";
+
+// Voice mode. Hold anywhere on the conversation and the screen becomes water: ripples travel
+// out from under your finger across the whole phone, and whatever they pass through (the
+// bubbles, the words) curves with them, subtly. Then Force is listening, and every rise in
+// your voice sends another ripple from the same point. Tap anywhere to finish.
+//
+// How: the screen is photographed once (html2canvas), handed to WebGL, and bent by a ripple
+// shader. Nothing underneath changes while you talk, so the photograph stays true.
+
+import { useEffect, useRef, useState } from "react";
+import type { Clip } from "@/data/mira";
+import { f } from "@/lib/f/store";
+import { record, type Recording } from "@/lib/f/audio";
+import { water, type Water } from "@/lib/f/ripple";
+import { I, haptic } from "./ui";
+
+export default function VoiceMode({ origin, shotOf, onClose, limit, onClip }: { origin: { x: number; y: number }; shotOf: HTMLElement | null; onClose: () => void; limit?: number; onClip?: (clip: Clip) => void }) {
+  const cv = useRef<HTMLCanvasElement>(null);
+  const [rec, setRec] = useState<Recording | null>(null);
+  const [ready, setReady] = useState(false);
+  const [settled, setSettled] = useState(false); // the first wave has crossed; now the pill
+  const [secs, setSecs] = useState(0);
+  const recRef = useRef<Recording | null>(null);
+  const done = useRef(false);
+
+  // Start listening the moment you hold.
+  useEffect(() => {
+    let live = true;
+    haptic("done");
+    record()
+      .then((r) => {
+        if (!live) return r.cancel();
+        if (!r.real) f.toast("No microphone access, so this records a sample.");
+        recRef.current = r;
+        setRec(r);
+      })
+      .catch(() => {
+        f.toast("Recording isn't available in this browser.");
+        onClose();
+      });
+    return () => {
+      live = false;
+    };
+  }, [onClose]);
+
+  // Photograph the screen, then let the water run.
+  useEffect(() => {
+    const c = cv.current;
+    if (!c || !shotOf) return;
+    let w: Water | null = null;
+    let raf = 0;
+    let live = true;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    // The browser's own renderer photographs the screen (SVG foreignObject). If that fails,
+    // html2canvas draws it by hand.
+    // Cloned scroll containers forget where they were scrolled to, so the clone's contents are
+    // shifted up by the same amount: the photograph shows the conversation where you left it.
+    const scrolled = Array.from(shotOf.querySelectorAll<HTMLElement>("[data-scroll]")).map((el) => ({ key: el.dataset.scroll!, top: el.scrollTop }));
+    import("modern-screenshot")
+      .then(({ domToCanvas }) =>
+        domToCanvas(shotOf, {
+          scale: dpr,
+          backgroundColor: "#f6f5f3",
+          filter: (n) => !(n instanceof Element && (n.hasAttribute("data-no-shot") || n.tagName === "NEXTJS-PORTAL")),
+          onCloneNode: (cloned) => {
+            if (!(cloned instanceof Element)) return;
+            scrolled.forEach(({ key, top }) => {
+              const el = cloned.querySelector<HTMLElement>(`[data-scroll="${key}"]`);
+              if (!el || !top) return;
+              el.style.overflow = "hidden";
+              Array.from(el.children).forEach((c) => ((c as HTMLElement).style.translate = `0 ${-top}px`));
+            });
+          },
+        }),
+      )
+      .catch(() =>
+        import("html2canvas").then(({ default: html2canvas }) =>
+          html2canvas(shotOf, {
+            scale: dpr,
+            backgroundColor: "#f6f5f3",
+            logging: false,
+            useCORS: true,
+            ignoreElements: (el) => el.hasAttribute("data-no-shot") || el.tagName === "NEXTJS-PORTAL",
+          }),
+        ),
+      )
+      .then((shot) => {
+        if (!live) return;
+        const start = performance.now();
+        w = water(c, shot, origin, start);
+        if (!w) return;
+        setReady(true);
+        // The touch, and a softer second ring behind it
+        w.ring(1);
+        setTimeout(() => w?.ring(0.5), 180);
+        setTimeout(() => setSettled(true), 1100);
+        let lastVoice = start;
+        let lastIdle = start + 400;
+        const frame = (now: number) => {
+          // The surface keeps moving while Force listens; your voice sends stronger ripples
+          const level = recRef.current?.level() ?? 0;
+          if (level > 0.3 && now - lastVoice > 220) {
+            lastVoice = now;
+            lastIdle = now;
+            w?.ring(Math.min(0.6, 0.2 + level * 0.5));
+          } else if (now - lastIdle > 1300) {
+            lastIdle = now;
+            w?.ring(0.28);
+          }
+          w?.frame(now);
+          raf = requestAnimationFrame(frame);
+        };
+        raf = requestAnimationFrame(frame);
+      })
+      .catch(() => {
+        // No photograph: nothing to bend, so just listen.
+        setReady(true);
+      });
+    return () => {
+      live = false;
+      cancelAnimationFrame(raf);
+      w?.destroy();
+    };
+  }, [origin, shotOf]);
+
+  useEffect(() => {
+    if (!rec) return;
+    const id = setInterval(() => setSecs((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [rec]);
+
+  const finish = async () => {
+    if (done.current) return;
+    done.current = true;
+    const r = recRef.current;
+    haptic("soft");
+    onClose();
+    if (!r) return;
+    const clip = await r.stop();
+    if (onClip) onClip(clip);
+    else f.addClip(clip);
+  };
+  // With a limit, it finishes on its own.
+  useEffect(() => {
+    if (!limit || !rec || secs < limit) return;
+    finish();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- finish is stable for the mount
+  }, [secs, limit, rec]);
+  const cancel = () => {
+    if (done.current) return;
+    done.current = true;
+    recRef.current?.cancel();
+    onClose();
+  };
+
+  return (
+    <div data-no-shot className="absolute inset-0 z-[70]" onClick={finish} role="dialog" aria-label="Voice mode. Tap anywhere to finish.">
+      <canvas ref={cv} className="absolute inset-0 h-full w-full transition-opacity duration-200" style={{ opacity: ready ? 1 : 0 }} aria-hidden />
+      <button
+        type="button"
+        aria-label="Cancel"
+        onClick={(e) => {
+          e.stopPropagation();
+          cancel();
+        }}
+        className="press pill absolute right-4 h-11 w-11 justify-center p-0 text-ink"
+        style={{ top: "calc(var(--sat) + 10px)" }}
+      >
+        <I.Close size={18} />
+      </button>
+      {/* Once the first wave has crossed, the field becomes the listening pill */}
+      <div className="pointer-events-none absolute inset-x-4 flex h-[52px] items-center justify-between rounded-[26px] bg-paper px-5 transition-opacity duration-300" style={{ bottom: "calc(var(--sab) + 8px)", boxShadow: "var(--lift-1)", opacity: settled ? 1 : 0 }}>
+        <span className="flex items-center gap-2 t-body font-medium text-ink">
+          <span className="relative flex h-2 w-2">
+            <span className={`absolute inset-0 rounded-full ${rec ? "bg-blue" : "bg-ink-4"}`} />
+            {rec && <span className="absolute inset-0 animate-ping rounded-full bg-blue opacity-60" />}
+          </span>
+          {rec ? "Listening" : "One moment"}
+          {rec && (
+            <span className="t-num text-ink-3">
+              {limit ? `${Math.max(0, limit - secs)}s left` : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`}
+            </span>
+          )}
+        </span>
+        <span className="t-label text-ink-3">Tap anywhere to finish</span>
+      </div>
+    </div>
+  );
+}

@@ -1,26 +1,431 @@
 @import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@import "../styles/tokens.css";
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: var(--paper);
+  --color-canvas: var(--canvas);
+  --color-blue: var(--blue);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-fill: var(--fill);
+  --color-fill-2: var(--fill-2);
+  --font-sans: var(--font-text);
+  --font-num: var(--font-num);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Type: Inter regular and medium, on a 4pt rhythm. rem, so it follows the text-size setting.
+   Her Figma uses 20 / 12 / 11 / 8. Reading text moves up to 14–15 because 12 is below what
+   iOS stays comfortable at for paragraphs; labels, meta and the graph keep her sizes. */
+/* Type follows the iOS text styles (Inter in place of SF): Title 2, Body, Subhead, Footnote,
+   Caption. Rem, so it scales with the person's text-size setting. */
+/* Apple's scale, one step down: she wants it a touch smaller than iOS's 17 default, so body
+   is 15 and everything else follows. At most three sizes per screen; hierarchy comes from
+   weight and colour, not more sizes. */
+@utility t-large {
+  font-size: 1.625rem; /* 26 · page titles */
+  line-height: 2rem;
+  font-weight: 700;
+}
+@utility t-nav {
+  font-size: 1rem; /* 16 · nav titles, names */
+  line-height: 1.3125rem;
+  font-weight: 600;
+}
+@utility t-title {
+  font-size: 1.25rem; /* 20 · section titles, the one line that matters */
+  line-height: 1.5625rem;
+  font-weight: 700;
+}
+@utility t-read {
+  font-size: 0.9375rem; /* 15 · body, loose: the entry page */
+  line-height: 1.4375rem;
+}
+@utility t-body {
+  font-size: 0.9375rem; /* 15 · body: chat, rows, inputs */
+  line-height: 1.25rem;
+}
+@utility t-label {
+  font-size: 0.8125rem; /* 13 · secondary text */
+  line-height: 1.125rem;
+}
+@utility t-meta {
+  font-size: 0.75rem; /* 12 · footnotes, captions */
+  line-height: 1rem;
+}
+@utility t-num {
+  font-family: var(--font-num);
+  font-size: 0.6875rem; /* 11 · dates, her Figma size */
+  line-height: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  /* On a phone the canvas runs edge to edge, behind the status bar; on a desktop the phone
+     frame sits on a dark stage. */
+  background: var(--canvas);
+  overflow: hidden;
+  overscroll-behavior: none;
+  font-family: var(--font-text);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
+button {
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+button:disabled {
+  cursor: default;
+}
+
+[role="dialog"]:focus {
+  outline: none;
+}
+
+@layer base {
+  :focus-visible {
+    outline: 1.5px solid var(--ink);
+    outline-offset: 2px;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@layer components {
+/* Press feedback, everywhere something can be tapped. Fast in, slower out. */
+.press {
+  transition: transform 160ms var(--ease-out), background-color 160ms var(--ease-out), opacity 160ms var(--ease-out);
+}
+.press:active {
+  transform: scale(0.96);
+  transition-duration: 80ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .press:active {
+    transform: none;
+    opacity: 0.7;
+  }
+}
+
+/* Enlarge a small hit target without enlarging the artwork. */
+.hit {
+  position: relative;
+}
+.hit::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+
+}
+
+/* ── Bars ───────────────────────────────────────────────────────────── */
+
+/* Content scrolls under the top bar through a progressive blur: heavy at the top, gone by the
+   bottom. Three blurred layers, each masked a little shorter than the last. */
+.blur-top {
+  position: absolute;
+  inset: 0 0 auto 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.blur-top > i {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+.blur-top > i:nth-child(1) {
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 100%);
+}
+.blur-top > i:nth-child(2) {
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 78%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 78%);
+}
+.blur-top > i:nth-child(3) {
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 15%, transparent 55%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 15%, transparent 55%);
+}
+.blur-top > i:nth-child(4) {
+  background: linear-gradient(to bottom, rgb(246 245 243) 0%, rgb(246 245 243 / 0.7) 45%, rgb(246 245 243 / 0) 100%);
+}
+
+/* A row that scrolls sideways without cutting off its children's shadows. */
+.scroll-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 10px 16px;
+  margin: -10px 0;
+}
+.scroll-row::-webkit-scrollbar {
+  display: none;
+}
+.scroll-row::after {
+  content: "";
+  flex: 0 0 8px;
+}
+
+/* ── Surfaces ─────────────────────────────────────────────────────────── */
+
+@layer components {
+/* White pill floating on the canvas */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: var(--r-chip);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--lift-1);
+}
+/* Grey pill sitting on paper */
+.pill-in {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  color: var(--ink);
+}
+/* Something you can say: a thin dotted edge, so it reads as a choice and never as a bubble. */
+.option {
+  background: transparent;
+  color: var(--ink);
+  border: 1px dotted var(--grey-400);
+}
+.option:active {
+  background: var(--fill);
+}
+
+/* A chip: white and lifted, like every other control. On: ink. */
+.chip {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--lift-1);
+}
+.chip-on {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* A glossy sphere of a theme's hue: the one decorative thing in the app, so it's done
+   properly. Sized with font-size so every shadow scales with it. */
+.orb {
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+  width: 1em;
+  height: 1em;
+  border-radius: 50%;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--grey-200);
+  box-shadow:
+    inset 0 0 0 0.02em rgba(255, 255, 255, 0.55),
+    inset 0 -0.1em 0.22em rgba(28, 27, 26, 0.12),
+    inset 0 0.08em 0.2em rgba(255, 255, 255, 0.45),
+    0 0.08em 0.18em rgba(28, 27, 26, 0.1),
+    0 0.3em 0.5em -0.2em rgba(28, 27, 26, 0.2);
+}
+.orb > i {
+  position: absolute;
+  inset: -25%;
+  display: block;
+  filter: blur(0.12em);
+}
+.orb > b {
+  position: absolute;
+  inset: 0;
+  display: block;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.4) 20%, rgba(255, 255, 255, 0) 48%),
+    radial-gradient(circle at 50% 115%, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 45%);
+}
+.pill-in:active {
+  background: var(--fill-2);
+}
+.pill-ink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: var(--r-chip);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+}
+
+/* The page. */
+.ground {
+  position: absolute;
+  inset: 0;
+  background: var(--canvas);
+}
+
+/* ── The phone ───────────────────────────────────────────────────────── */
+
+/* On a phone the app is pinned to the screen: nothing scrolls, and the canvas fills every
+   edge, under the status bar and the home indicator. */
+.stage {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.frame {
+  width: 100%;
+  height: 100%;
+}
+.device {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  isolation: isolate;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  -webkit-user-select: none;
+  user-select: none;
+  /* Contain position:fixed children inside the phone */
+  transform: translateZ(0);
+}
+.frame-only {
+  display: none;
+}
+@media (min-width: 768px) {
+  body {
+    background: #1c1c1c;
+  }
+  .stage {
+    position: static;
+    min-height: 100dvh;
+    padding: 32px 0;
+  }
+  .frame {
+    width: auto;
+    height: auto;
+    padding: 11px;
+    border-radius: 66px;
+    background: #0b0b0b;
+    box-shadow: 0 0 0 1px #2c2c2c, 0 40px 80px -20px rgba(0, 0, 0, 0.5);
+  }
+  .device {
+    width: 402px;
+    height: 874px;
+    border-radius: 55px;
+    --sat: 54px;
+    --sab: 20px;
+  }
+  .frame-only {
+    display: block;
+  }
+}
+
+/* ── Writing ─────────────────────────────────────────────────────────── */
+
+.prose {
+  -webkit-user-select: text;
+  user-select: text;
+  outline: none;
+  caret-color: var(--ink);
+}
+.prose:empty::before {
+  content: attr(data-placeholder);
+  color: var(--ink-3);
+  pointer-events: none;
+}
+.prose b,
+.prose strong {
+  font-weight: 600;
+}
+.prose h2 {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 500;
+  margin: 8px 0 4px;
+}
+.prose h3 {
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 500;
+  margin: 8px 0 2px;
+}
+.prose ul,
+.prose ol {
+  margin: 4px 0;
+  padding-left: 22px;
+}
+.prose ul {
+  list-style: disc;
+}
+.prose ol {
+  list-style: decimal;
+}
+.prose li + li {
+  margin-top: 2px;
+}
+.prose blockquote {
+  margin: 8px 0;
+  padding-left: 14px;
+  border-left: 2px solid var(--ink);
+  color: var(--ink-2);
+}
+.prose u {
+  text-underline-offset: 3px;
+}
+.prose a {
+  text-decoration: underline;
+  text-decoration-color: var(--ink-4);
+  text-underline-offset: 3px;
+}
+.prose ::selection,
+.selectable::selection {
+  background: rgba(17, 17, 17, 0.12);
+}
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Keyboard open: the home indicator is hidden, so don't pad for it. */
+.device[data-kb] {
+  --sab: 0px;
 }
