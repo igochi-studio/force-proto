@@ -1,11 +1,12 @@
 "use client";
 
-// Home, for the residency. Two tabs, the way the energy page always started:
-//   Conversations: Force first, then everyone here, open threads on top.
+// Home, for the residency, in the order you meet it: you (your face, top left, opens your
+// pattern map), then two tabs:
 //   People: the energy map. You low in the middle, everyone in the residency strung to you in
 //   their painting, the shorter the strand the nearer their patterns are to yours. Tap
 //   someone and their card grows out of them: what they're on, what you share, where else
 //   they are, and a way to talk.
+//   Conversations: Force first, then everyone here, open threads on top.
 // Under both, the side quests Force suggests, as painted covers.
 
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -35,18 +36,19 @@ export default function Residents() {
   const name = useR((s) => s.name);
   return (
     <div className="absolute inset-0 flex flex-col overflow-hidden" style={{ paddingTop: "var(--sat)", paddingBottom: "var(--sab)" }}>
+      {/* You first, then the people who share your patterns, then what you've started with them */}
       <header className="flex h-[60px] shrink-0 items-center gap-3 px-4 pt-2">
+        <button type="button" aria-label={`${name || "You"}: who Force thinks you are`} onClick={() => (haptic(), f.push({ name: "persona" }))} className="press shrink-0 rounded-full">
+          <Glass size={44} {...ME_FACE} zoom={260} />
+        </button>
         <div className="flex h-11 flex-1 rounded-full bg-paper p-1" style={{ boxShadow: "var(--lift-1)" }} role="tablist">
-          {(["conversations", "people"] as Tab[]).map((t) => (
+          {(["people", "conversations"] as Tab[]).map((t) => (
             <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => (haptic(), r.setTab(t))} className={`relative flex-1 rounded-full t-label font-medium transition-colors duration-200 ${tab === t ? "text-paper" : "text-ink-2"}`}>
               {tab === t && <motion.span layoutId="home-tab" className="absolute inset-0 rounded-full bg-ink" transition={SPRING.ui} />}
               <span className="relative">{t === "conversations" ? "Conversations" : "People"}</span>
             </button>
           ))}
         </div>
-        <button type="button" aria-label={`${name || "You"}: who Force thinks you are`} onClick={() => (haptic(), f.push({ name: "persona" }))} className="press shrink-0 rounded-full">
-          <Glass size={44} {...ME_FACE} zoom={260} />
-        </button>
       </header>
 
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-4">

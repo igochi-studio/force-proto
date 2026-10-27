@@ -29,7 +29,7 @@ interface R {
 }
 
 const KEY = "force.residency";
-const FRESH: R = { done: false, name: "", links: {}, extra: [], onairos: "off", answers: [], points: [], found: [], removed: [], moves: {}, fit: null, clips: [], agreed: [], tab: "conversations", tip: false };
+const FRESH: R = { done: false, name: "", links: {}, extra: [], onairos: "off", answers: [], points: [], found: [], removed: [], moves: {}, fit: null, clips: [], agreed: [], tab: "people", tip: false };
 
 const load = (): R => {
   try {
@@ -103,7 +103,7 @@ export const r = {
   setFit(fit: Fit) {
     set({ fit });
   },
-  finish(tab: R["tab"] = "conversations") {
+  finish(tab: R["tab"] = "people") {
     set({ done: true, tab });
   },
   tipSeen() {
