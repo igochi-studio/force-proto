@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Keyboard } from "lucide-react";
 import type { Art, Clip } from "@/data/mira";
-import { HEADLINE, LINKS, ONAIROS_ART, QUESTIONS, pretty, type LinkKind } from "@/data/residency";
+import { HEADLINE, LINKS, QUESTIONS, pretty, type LinkKind } from "@/data/residency";
 import { f } from "@/lib/f/store";
 import { r, useR } from "@/lib/f/residency";
 import PaintedMark from "../f/PaintedMark";
@@ -218,13 +218,13 @@ function Connect({ onNext }: { onNext: () => void }) {
 
 // ── The three questions ──
 
-type Line = { id: string; from: "force" | "me"; text?: string; clip?: Clip; reading?: boolean; map?: boolean };
+type Line = { id: string; from: "force" | "me"; text?: string; clip?: Clip; map?: boolean };
 const LIMIT = 90;
 // The recorder: a glass bubble with the dusk painting in it.
-const ORB = { art: "hills" as Art, x: 74, y: 18, size: 76 };
+const ORB = { art: "hills" as Art, x: 58, y: 34, size: 76, zoom: 150 };
 
 function Talk({ onNext }: { onNext: () => void }) {
-  const { name, links, onairos } = useR();
+  const name = useR((s) => s.name);
   const [lines, setLines] = useState<Line[]>([]);
   const [typing, setTyping] = useState(false);
   const [qi, setQi] = useState(0);
@@ -275,19 +275,18 @@ function Talk({ onNext }: { onNext: () => void }) {
       return;
     }
     setPhase("reading");
-    await say("That's all three. Give me a moment with your answers and your links.", 800);
-    setLines((l) => [...l, { id: "reading", from: "force", reading: true }]);
+    await say("That's all three. Give me a moment.", 800);
     r.read(answers.current, clips.current.filter((c) => c.src));
+    setLines((l) => [...l, { id: "map", from: "force", map: true }]);
     // Your answers are your first moments in memory: recordings as voice notes, typed ones as written.
     if (clips.current.length) f.keepClips(clips.current);
     f.keepTexts(lines.filter((l) => l.from === "me" && l.text).map((l) => l.text!).concat(a.text ? [a.text] : []));
   };
 
-  // Read: the pattern map arrives in the conversation, the way the world used to.
+  // The pattern map has finished painting: Force says what to do with it.
   const read = async () => {
     if (mapped.current) return;
     mapped.current = true;
-    setLines((l) => [...l, { id: "map", from: "force", map: true }]);
     await say("That's my first read of you. Tap it to open it up: keep what's true, fix what isn't.", 1100);
     setPhase("done");
   };
@@ -300,13 +299,6 @@ function Talk({ onNext }: { onNext: () => void }) {
     setVoice({ x: b.left + b.width / 2 - (box?.left ?? 0), y: b.top + b.height / 2 - (box?.top ?? 0), el: root.current });
   };
 
-  const sources: Source[] = [
-    ...LINKS.filter((l) => links[l.kind]?.trim()).map((l) => ({ key: l.kind, name: l.name, art: l.art, x: l.x, y: l.y, mark: MARKS[l.kind] })),
-    ...(onairos === "on" ? [{ key: "onairos", name: "Onairos", ...ONAIROS_ART, mark: OnairosMark }] : []),
-    { key: "search", name: "what's public under your name", art: "water" as Art, x: 70, y: 30, mark: ({ size }: { size?: number }) => <I.Search size={size} /> },
-    { key: "answers", name: "your three answers", ...ORB, mark: ({ size }: { size?: number }) => <I.Wave size={size} /> },
-  ];
-
   return (
     <div ref={root} className="relative flex min-h-0 flex-1 flex-col">
       <ul ref={list} data-scroll="talk" aria-live="polite" className="no-scrollbar flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-4 pb-3 pt-2">
@@ -315,15 +307,13 @@ function Talk({ onNext }: { onNext: () => void }) {
         </li>
         {lines.map((m, i) => {
           const prev = lines[i - 1];
-          const first = !prev || prev.from !== m.from || !!prev.reading || !!prev.map;
+          const first = !prev || prev.from !== m.from || !!prev.map;
           const nextL = lines[i + 1];
-          const last = !nextL || nextL.from !== m.from || !!nextL.reading || !!nextL.map;
+          const last = !nextL || nextL.from !== m.from || !!nextL.map;
           return (
-            <motion.li key={m.id} layout="position" className={`flex ${m.reading ? "justify-center" : m.from === "me" ? "justify-end" : "justify-start"} ${first || m.map ? "mt-3" : ""}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", duration: 0.4, bounce: 0 }}>
+            <motion.li key={m.id} layout="position" className={`flex ${m.from === "me" ? "justify-end" : "justify-start"} ${first || m.map ? "mt-3" : ""}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", duration: 0.4, bounce: 0 }}>
               {m.map ? (
-                <MapCard onOpen={() => (haptic("soft"), setOpen(true))} />
-              ) : m.reading ? (
-                <Reading sources={sources} onDone={read} />
+                <MapCard onRead={read} onOpen={() => (haptic("soft"), setOpen(true))} />
               ) : m.clip ? (
                 <AudioBubble clip={m.clip} />
               ) : (
@@ -370,23 +360,42 @@ function Talk({ onNext }: { onNext: () => void }) {
   );
 }
 
-// The pattern map, in the conversation: you, painted, and the one line. Tap to open it up.
-function MapCard({ onOpen }: { onOpen: () => void }) {
+// The pattern map, in the conversation. It arrives at once and paints itself while Force
+// analyses: one stroke for each thing it's reading. Only when it's done does it become
+// something you can open.
+function MapCard({ onOpen, onRead }: { onOpen: () => void; onRead: () => void }) {
   const points = useR((s) => s.points);
+  const [ready, setReady] = useState(false);
   return (
-    <button type="button" onClick={onOpen} className="press block w-full overflow-hidden rounded-[24px] bg-paper text-left" style={{ boxShadow: "var(--lift-1)" }}>
-      <span className="flex items-center justify-between px-4 pt-3">
+    <button type="button" disabled={!ready} onClick={onOpen} className="press block w-full overflow-hidden rounded-[24px] bg-paper text-left disabled:active:scale-100" style={{ boxShadow: "var(--lift-1)" }}>
+      <span className="flex h-11 items-center justify-between px-4 pt-1">
         <span className="flex items-center gap-2 t-label font-medium text-ink-2">
           <Paint name="pattern-maps" h={16} /> Pattern map
         </span>
-        <span className="grid h-8 w-8 place-items-center rounded-full bg-fill text-ink" aria-hidden>
+        <span className="grid h-8 w-8 place-items-center rounded-full bg-fill text-ink transition-opacity duration-500" style={{ opacity: ready ? 1 : 0 }} aria-hidden>
           <I.Expand size={14} />
         </span>
       </span>
-      <PaintedYou sources={usePaintSources()} height={220} bare />
-      <span className="block px-4 pb-4">
-        <span className="block t-body font-semibold text-ink">{HEADLINE}</span>
-        <span className="mt-1 block t-label text-ink-3">{points.length} patterns about you · tap to open</span>
+      <PaintedYou
+        sources={usePaintSources()}
+        height={220}
+        bare
+        onDone={() => {
+          setReady(true);
+          onRead();
+        }}
+      />
+      <span className="block min-h-[68px] px-4 pb-4">
+        {ready ? (
+          <>
+            <span className="block t-body font-semibold text-ink">{HEADLINE}</span>
+            <span className="mt-1 block t-label text-ink-3">{points.length} patterns about you · tap to open</span>
+          </>
+        ) : (
+          <span className="block pt-2 t-label text-ink-3" aria-live="polite">
+            Analysing your answers and links…
+          </span>
+        )}
       </span>
     </button>
   );
@@ -429,42 +438,6 @@ function MapSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-type Source = { key: string; name: string; art: Art; x: number; y: number; mark: (p: { size?: number }) => React.ReactNode };
-
-// Where Force is reading from: each source's bubble fills with its painting in turn, a line
-// under them says which. No box, no list.
-function Reading({ sources, onDone }: { sources: Source[]; onDone: () => void }) {
-  const [n, setN] = useState(0);
-  const done = n >= sources.length;
-  useEffect(() => {
-    if (done) {
-      const id = setTimeout(onDone, 500);
-      return () => clearTimeout(id);
-    }
-    const id = setTimeout(() => setN((x) => x + 1), 800);
-    return () => clearTimeout(id);
-  }, [n, done, onDone]);
-  return (
-    <div className="flex w-full flex-col items-center py-6">
-      <div className="flex flex-wrap justify-center gap-3">
-        {sources.map((s, i) => {
-          const M = s.mark;
-          return (
-            <motion.span key={s.key} animate={{ scale: i < n ? [1, 1.14, 1] : 1, y: i === n ? -4 : 0 }} transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}>
-              <Glass size={48} art={s.art} x={s.x} y={s.y} zoom={280} dim={i >= n} spin={i === n}>
-                <M size={18} />
-              </Glass>
-            </motion.span>
-          );
-        })}
-      </div>
-      <p className="mt-4 t-label text-ink-3" aria-live="polite">
-        {done ? "Done. Here's who I think you are." : `Reading ${sources[n].name}…`}
-      </p>
-    </div>
-  );
-}
-
 // Answering: the glass bubble. Tap it and the screen turns to water from it while you talk;
 // tap anywhere when you're done. No holding, so it's the same on every phone. Or type.
 function Answer({ disabled, onListen, onAnswer }: { disabled: boolean; onListen: (el: HTMLElement) => void; onAnswer: (a: { text: string }) => void }) {
@@ -485,7 +458,7 @@ function Answer({ disabled, onListen, onAnswer }: { disabled: boolean; onListen:
       >
         <input value={text} onChange={(e) => setText(e.target.value)} autoFocus placeholder="Type your answer…" aria-label="Your answer" enterKeyHint="send" className="min-w-0 flex-1 bg-transparent t-body text-ink outline-none placeholder:text-ink-3" />
         <button type="button" aria-label="Talk instead" onClick={() => setTypingMode(false)} className="press grid h-10 w-10 shrink-0 place-items-center">
-          <Glass {...ORB} size={34} zoom={300}>
+          <Glass {...ORB} size={34}>
             <I.Mic size={15} />
           </Glass>
         </button>
@@ -505,7 +478,7 @@ function Answer({ disabled, onListen, onAnswer }: { disabled: boolean; onListen:
         className="rounded-full"
         whileTap={{ scale: 0.94 }}
       >
-        <Glass {...ORB} zoom={240}>
+        <Glass {...ORB}>
           <I.Mic size={26} />
         </Glass>
       </motion.button>

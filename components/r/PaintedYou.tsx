@@ -39,7 +39,12 @@ function along(pts: [number, number][], u: number): [number, number] {
 type Stroke = { pts: [number, number][]; w0: number; w1: number; t0: number; dur: number; src: number };
 
 // bare: no card of its own, for when it sits inside one.
-export default function PaintedYou({ sources, name, height = 280, bare }: { sources: Source[]; name?: string; height?: number; bare?: boolean }) {
+// onDone: called once, when the last stroke is down.
+export default function PaintedYou({ sources, name, height = 280, bare, onDone }: { sources: Source[]; name?: string; height?: number; bare?: boolean; onDone?: () => void }) {
+  const done = useRef(onDone);
+  useEffect(() => {
+    done.current = onDone;
+  }, [onDone]);
   const box = useRef<HTMLDivElement>(null);
   const cv = useRef<HTMLCanvasElement>(null);
   const [w, setW] = useState(0);
@@ -192,6 +197,7 @@ export default function PaintedYou({ sources, name, height = 280, bare }: { sour
       ctx.drawImage(layer, 0, 0);
       setT(tt);
       if (tt < END) raf = requestAnimationFrame(frame);
+      else done.current?.();
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);

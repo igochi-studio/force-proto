@@ -19,7 +19,7 @@ import type { Art } from "@/data/mira";
 
 // orb: the glass bubble the water starts from. It stays exactly where it was, still, above
 // the water, and the listening pill gives way to a quiet line over it.
-export default function VoiceMode({ origin, shotOf, onClose, limit, onClip, orb }: { origin: { x: number; y: number }; shotOf: HTMLElement | null; onClose: () => void; limit?: number; onClip?: (clip: Clip) => void; orb?: { art: Art; x: number; y: number; size: number; icon?: React.ReactNode } }) {
+export default function VoiceMode({ origin, shotOf, onClose, limit, onClip, orb }: { origin: { x: number; y: number }; shotOf: HTMLElement | null; onClose: () => void; limit?: number; onClip?: (clip: Clip) => void; orb?: { art: Art; x: number; y: number; size: number; zoom?: number; icon?: React.ReactNode } }) {
   const cv = useRef<HTMLCanvasElement>(null);
   const [rec, setRec] = useState<Recording | null>(null);
   const [ready, setReady] = useState(false);
@@ -27,6 +27,7 @@ export default function VoiceMode({ origin, shotOf, onClose, limit, onClip, orb 
   const [secs, setSecs] = useState(0);
   const recRef = useRef<Recording | null>(null);
   const done = useRef(false);
+  const [sample, setSample] = useState(false); // no microphone: say so quietly, in place
 
   // Start listening the moment you hold.
   useEffect(() => {
@@ -35,7 +36,7 @@ export default function VoiceMode({ origin, shotOf, onClose, limit, onClip, orb 
     record()
       .then((r) => {
         if (!live) return r.cancel();
-        if (!r.real) f.toast("No microphone access, so this records a sample.");
+        if (!r.real) setSample(true);
         recRef.current = r;
         setRec(r);
       })
@@ -176,7 +177,7 @@ export default function VoiceMode({ origin, shotOf, onClose, limit, onClip, orb 
       {orb && (
         <>
           <span className="pointer-events-none absolute" style={{ left: origin.x, top: origin.y, translate: "-50% -50%" }}>
-            <Glass size={orb.size} art={orb.art} x={orb.x} y={orb.y} zoom={240}>
+            <Glass size={orb.size} art={orb.art} x={orb.x} y={orb.y} zoom={orb.zoom ?? 240}>
               {orb.icon}
             </Glass>
           </span>
@@ -184,7 +185,8 @@ export default function VoiceMode({ origin, shotOf, onClose, limit, onClip, orb 
             {rec ? (
               <>
                 <span className="t-num text-ink-3">{limit ? `${Math.max(0, limit - secs)}s` : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`}</span>
-                <span className="mx-2 text-ink-4">·</span>Listening. Tap anywhere when you&apos;re done.
+                <span className="mx-2 text-ink-4">·</span>
+                {sample ? "No microphone, so this is a sample. Tap to finish." : "Listening. Tap anywhere when you're done."}
               </>
             ) : (
               "One moment"
