@@ -99,17 +99,6 @@ function Message({ m, first, lastOfGroup, gap }: { m: Msg; first: boolean; lastO
       >
         {body}
       </motion.li>
-      {/* Replies you can tap: on your side, a thin dotted edge, so they read as choices */}
-      {m.from === "force" && m.kind === "text" && m.options && (
-        <motion.li key={`${m.id}-o`} className="mt-2 flex flex-wrap justify-end gap-2 pl-10" initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.12 } }} transition={{ ...SPRING.move, delay: 0.15 }}>
-          {m.options.map((o) => (
-            <button key={o.label} type="button" onClick={() => f.pick(o)} className="press hit option flex h-10 items-center gap-1 rounded-full pl-[14px] pr-3 t-body">
-              {o.label}
-              <I.Chevron size={16} className={o.go ? "text-ink-4" : "hidden"} />
-            </button>
-          ))}
-        </motion.li>
-      )}
     </>
   );
 }
@@ -118,6 +107,9 @@ function Message({ m, first, lastOfGroup, gap }: { m: Msg; first: boolean; lastO
 export default function Companion({ bare = false }: { bare?: boolean }) {
   const chat = useF((s) => s.chat);
   const list = useRef<HTMLUListElement>(null);
+  // The newest of Force's messages, if it came with replies you can tap.
+  const lastForce = [...chat].reverse().find((m) => m.from === "force" && m.kind === "text");
+  const quick = lastForce && lastForce.from === "force" && lastForce.kind === "text" && lastForce.options?.length ? { id: lastForce.id, options: lastForce.options } : null;
   const root = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
   const [voice, setVoice] = useState<{ x: number; y: number; el: HTMLElement | null } | null>(null);
@@ -234,6 +226,19 @@ export default function Companion({ bare = false }: { bare?: boolean }) {
         </AnimatePresence>
       </ul>
 
+      {/* Replies you can tap sit just above the field, where your thumb already is */}
+      <AnimatePresence initial={false}>
+        {quick && (
+          <motion.div key={quick.id} className="scroll-row no-scrollbar relative z-10 shrink-0 pb-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.12 } }} transition={{ duration: 0.2 }}>
+            {quick.options.map((o) => (
+              <button key={o.label} type="button" onClick={() => f.pick(o)} className="press pill h-10 shrink-0 gap-1 whitespace-nowrap pl-4 pr-3 t-body">
+                {o.label}
+                <I.Chevron size={16} className={o.go ? "text-ink-4" : "hidden"} />
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
       <Composer />
       <div aria-hidden className="h-2 shrink-0" />
 

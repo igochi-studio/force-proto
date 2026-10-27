@@ -243,12 +243,13 @@ export default function Persona({ sheet }: { sheet?: boolean }) {
               r.addPoint(own);
               setOwn("");
             }}
-            className="option flex h-14 items-center gap-2 rounded-[28px] pl-5 pr-2"
+            className="flex h-[52px] items-center gap-2 rounded-full bg-paper pl-5 pr-[6px]"
+            style={{ boxShadow: "var(--lift-1)" }}
           >
             <input value={own} onChange={(e) => setOwn(e.target.value)} placeholder="Something Force missed…" aria-label="Add something Force missed" enterKeyHint="done" className="min-w-0 flex-1 bg-transparent t-body text-ink outline-none placeholder:text-ink-3" />
             {own.trim() && (
-              <button type="submit" aria-label="Add" className="press grid h-10 w-10 place-items-center rounded-full bg-ink text-paper">
-                <I.Up size={16} />
+              <button type="submit" aria-label="Add" onPointerDown={(e) => e.preventDefault()} className="press grid h-10 w-10 place-items-center rounded-full bg-ink text-paper">
+                <I.Up size={18} />
               </button>
             )}
           </form>
