@@ -117,7 +117,7 @@ export default function Composer() {
 
   // Tap the mic to record and tap stop to send, or hold it and let go. Tapping works the same
   // on every phone; holding is the shortcut.
-  const hold = useRef<{ timer?: ReturnType<typeof setTimeout>; holding: boolean; released: boolean }>({ holding: false, released: false });
+  const hold = useRef<{ timer?: ReturnType<typeof setTimeout>; holding: boolean; released: boolean; at: number }>({ holding: false, released: false, at: 0 });
   const [tapped, setTapped] = useState(false);
   const live = useRef<{ r: Recording } | null>(null);
   useEffect(() => {
@@ -132,7 +132,7 @@ export default function Composer() {
   const holdStart = (e: React.PointerEvent) => {
     if (starting || rec || saving) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    hold.current = { holding: false, released: false, timer: setTimeout(() => {
+    hold.current = { holding: false, released: false, at: performance.now(), timer: setTimeout(() => {
       hold.current.holding = true;
       startRec();
     }, 160) };
@@ -145,6 +145,8 @@ export default function Composer() {
       return startRec();
     }
     h.holding = false;
+    // Let go within half a second: that was a tap, so keep recording until stop is tapped.
+    if (performance.now() - h.at < 500) return setTapped(true);
     if (live.current) stopRec();
     else h.released = true;
   };
@@ -294,7 +296,15 @@ export default function Composer() {
                   holdStart(e);
                 }}
                 onPointerUp={holdEnd}
-                onPointerCancel={() => clearTimeout(hold.current.timer)}
+                onPointerCancel={() => {
+                  // The browser took the touch (a scroll, a system gesture): keep what's
+                  // recording going, as a tap, so it's stopped with the stop button.
+                  clearTimeout(hold.current.timer);
+                  if (hold.current.holding) {
+                    hold.current.holding = false;
+                    setTapped(true);
+                  }
+                }}
                 onContextMenu={(e) => e.preventDefault()}
                 className="press hit grid h-9 w-9 touch-none select-none place-items-center text-ink"
                 initial={{ opacity: 0 }}

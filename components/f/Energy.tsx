@@ -15,6 +15,7 @@ import { ART_SRC, ART_TONE } from "@/data/mira";
 import { INCOMING, MIRA_FACE, PEOPLE, personById, questById, type Person } from "@/data/social";
 import { f, useF, type DmMsg } from "@/lib/f/store";
 import Glass from "./Glass";
+import { ME_FACE } from "@/data/residency";
 import Face from "./Face";
 import Goo, { string, type Blob } from "./Goo";
 import Nav from "./Nav";
@@ -391,10 +392,12 @@ function Card({ p, x, y, state, wants, onClose, inPlace }: { p: Person; x: numbe
 
 // You and them, and the distance between you, drawn rather than written.
 function Between({ p }: { p: Person }) {
+  // In the residency you're someone new, not the demo's Mira
+  const me = useF((s) => s.demo) === "new" ? ME_FACE : MIRA_FACE;
   return (
     <div className="flex w-full items-center justify-center gap-3 px-6">
       <span className="flex flex-col items-center gap-1">
-        <Face face={MIRA_FACE} size={52} />
+        <Face face={me} size={52} />
         <span className="t-meta text-ink-3">You</span>
       </span>
       <span className="relative flex h-12 flex-1 items-center">

@@ -132,6 +132,8 @@ export const greeting = () => {
 let typingTimer: ReturnType<typeof setTimeout> | undefined;
 
 function forceSays(text: string, delay = 900, options?: Opt[], note?: Msg) {
+  // Shortcuts into the demo's energy map only make sense in the demo
+  if (get().demo === "new") options = options?.filter((o) => !o.go);
   const tid = uid("t");
   set((s) => ({ chat: [...s.chat.filter((m) => m.kind !== "typing"), { id: tid, from: "force", kind: "typing" }] }));
   clearTimeout(typingTimer);

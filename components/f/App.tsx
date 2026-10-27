@@ -124,7 +124,7 @@ function Panel() {
           <motion.div key={keyOf(top)} className="absolute inset-0 bg-canvas" style={{ paddingTop: top.name === "dive" || top.name === "force" ? 0 : "var(--sat)", paddingBottom: top.name === "dive" || top.name === "force" ? 0 : "var(--sab)", x }} onPointerDown={(e) => start(e, false)} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
             <Page s={top} />
           </motion.div>
-          <div className="absolute inset-y-0 left-0 z-30 w-5" style={{ touchAction: "pan-y" }} onPointerDown={(e) => start(e, true)} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} aria-hidden />
+          <div className="absolute inset-y-0 left-0 z-30 w-3" style={{ touchAction: "pan-y" }} onPointerDown={(e) => start(e, true)} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} aria-hidden />
         </motion.div>
       )}
     </AnimatePresence>
@@ -179,7 +179,7 @@ export default function App({ residency = false }: { residency?: boolean }) {
   }, []);
   return (
     <LayoutGroup>
-      <motion.div className="absolute inset-0" animate={{ scale: open ? 0.96 : 1, opacity: open ? 0 : 1 }} transition={SPRING.move} aria-hidden={open || sheet} inert={open || sheet}>
+      <motion.div className="absolute inset-0" animate={{ scale: open ? 0.96 : 1, opacity: open ? 0 : 1 }} transition={SPRING.move} aria-hidden={open || sheet || (residency && !rDone)} inert={open || sheet || (residency && !rDone)}>
         {residency ? <Residents /> : <Companion />}
       </motion.div>
       <div inert={sheet} aria-hidden={sheet || undefined}>

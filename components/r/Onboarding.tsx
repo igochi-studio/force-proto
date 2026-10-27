@@ -24,7 +24,7 @@ import PatternWorld from "./PatternWorld";
 
 type Step = "splash" | "connect" | "talk";
 
-export function Primary({ children, onClick, disabled }: { children: React.ReactNode; onClick: () => void; disabled?: boolean }) {
+function Primary({ children, onClick, disabled }: { children: React.ReactNode; onClick: () => void; disabled?: boolean }) {
   return (
     <button type="button" disabled={disabled} onClick={onClick} className="press pill-ink h-[52px] w-full justify-center gap-2 t-body font-medium disabled:bg-fill disabled:text-ink-3">
       {children}
@@ -33,9 +33,9 @@ export function Primary({ children, onClick, disabled }: { children: React.React
 }
 
 // Steps cross-fade in place: nothing slides, nothing bounces.
-function Screen({ k, children }: { k: string; children: React.ReactNode }) {
+function Screen({ children }: { children: React.ReactNode }) {
   return (
-    <motion.div key={k} className="flex min-h-0 flex-1 flex-col" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.22, ease: "easeOut" }}>
+    <motion.div className="flex min-h-0 flex-1 flex-col" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.22, ease: "easeOut" }}>
       {children}
     </motion.div>
   );
@@ -60,7 +60,7 @@ export default function ResidencyOnboarding() {
     <motion.div className="absolute inset-0 z-[60] flex flex-col bg-canvas" style={{ paddingTop: "var(--sat)", paddingBottom: "var(--sab)" }} exit={{ opacity: 0, transition: { duration: 0.3 } }}>
       <AnimatePresence mode="wait" initial={false}>
         {step === "splash" && (
-          <Screen k="splash">
+          <Screen key="splash">
             <button type="button" onClick={() => painted && go("connect")} className="flex flex-1 flex-col items-center justify-center px-6 text-center" aria-label="Continue">
               <PaintedMark size={236} onDone={() => setPainted(true)} />
               <motion.p className="mt-10 max-w-[330px] t-body text-ink-2" initial={{ opacity: 0 }} animate={{ opacity: painted ? 1 : 0 }} transition={{ duration: 0.5 }}>
@@ -70,12 +70,12 @@ export default function ResidencyOnboarding() {
           </Screen>
         )}
         {step === "connect" && (
-          <Screen k="connect">
+          <Screen key="connect">
             <Connect onNext={() => go("talk")} />
           </Screen>
         )}
         {step === "talk" && (
-          <Screen k="talk">
+          <Screen key="talk">
             <Talk
               onNext={() => {
                 haptic("done");
@@ -130,6 +130,7 @@ function Talk({ onNext }: { onNext: () => void }) {
   const [phase, setPhase] = useState<"ask" | "reading" | "done">("ask");
   const [voice, setVoice] = useState<{ x: number; y: number; el: HTMLElement | null } | null>(null);
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false); // finished talking; the clip is on its way
   const mapped = useRef(false);
   const answers = useRef<string[]>([]);
   const clips = useRef<Clip[]>([]);
@@ -163,6 +164,9 @@ function Talk({ onNext }: { onNext: () => void }) {
   }, [lines, typing]);
 
   const answered = async (a: { clip?: Clip; text?: string }) => {
+    setSaving(false);
+    // One answer per question, however it arrives
+    if (answers.current.length !== qi) return;
     setLines((l) => [...l, { id: `me${l.length}`, from: "me", ...a }]);
     // A sample recording (no mic) has someone else's words; read the residency sample instead.
     answers.current = [...answers.current, a.clip ? (a.clip.src ? a.clip.transcript : "") : (a.text ?? "")];
@@ -235,7 +239,7 @@ function Talk({ onNext }: { onNext: () => void }) {
         {phase === "done" ? (
           <Primary onClick={onNext}>Find people with this energy</Primary>
         ) : phase === "ask" ? (
-          <Answer key={qi} disabled={typing || !!voice} onListen={listen} onAnswer={answered} />
+          <Answer key={qi} disabled={typing || !!voice || saving} onListen={listen} onAnswer={answered} />
         ) : (
           <div className="h-[116px]" />
         )}
@@ -249,6 +253,7 @@ function Talk({ onNext }: { onNext: () => void }) {
             shotOf={voice.el}
             limit={LIMIT}
             orb={{ ...ORB, icon: <I.Mic size={26} /> }}
+            onStop={() => setSaving(true)}
             onClip={(clip) => answered({ clip: { ...clip, name: `Answer ${qi + 1}` } })}
             onClose={() => setVoice(null)}
           />

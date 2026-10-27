@@ -1,12 +1,12 @@
 "use client";
 
 // The residency's own state: who you are, what you connected, your three answers, and the
-// persona Force read from them, with your edits. Kept in the browser so a refresh doesn't
-// start you over; ?reset=1 does.
+// persona Force read from them, with your edits. Saved in the browser; a visit starts fresh
+// unless the address has ?keep=1.
 
 import { create } from "zustand";
 import type { Clip } from "@/data/mira";
-import { foundFor, pointsFrom, MOVES, type Found, type LinkKind, type Point } from "@/data/residency";
+import { foundFor, pointsFrom, type Found, type LinkKind, type Point } from "@/data/residency";
 
 export type Fit = "spot" | "mostly" | "no";
 
@@ -20,7 +20,6 @@ interface R {
   points: Point[];
   found: Found[];
   removed: string[]; // found items that weren't you
-  moves: Record<string, "kept" | "dropped">;
   fit: Fit | null;
   clips: Clip[]; // your recorded answers, for this visit only (the audio doesn't survive a refresh)
   agreed: string[]; // points you said were you
@@ -29,11 +28,14 @@ interface R {
 }
 
 const KEY = "force.residency";
-const FRESH: R = { done: false, name: "", links: {}, extra: [], onairos: "off", answers: [], points: [], found: [], removed: [], moves: {}, fit: null, clips: [], agreed: [], tab: "people", tip: false };
+const FRESH: R = { done: false, name: "", links: {}, extra: [], onairos: "off", answers: [], points: [], found: [], removed: [], fit: null, clips: [], agreed: [], tab: "people", tip: false };
 
+// For the residency demo every visit starts from the beginning, decided here, before anything
+// renders, so there's never a flash of last visit. ?keep=1 picks up where you left off.
 const load = (): R => {
   try {
-    const s = typeof window !== "undefined" && localStorage.getItem(KEY);
+    if (typeof window === "undefined" || new URLSearchParams(window.location.search).get("keep") !== "1") return FRESH;
+    const s = localStorage.getItem(KEY);
     return s ? { ...FRESH, ...JSON.parse(s), clips: [], onairos: JSON.parse(s).onairos === "on" ? "on" : "off" } : FRESH;
   } catch {
     return FRESH;
@@ -51,16 +53,14 @@ useR.subscribe((s) => {
 });
 
 // Once Force has read you, changing a link means reading what's online again. What you
-// already said wasn't you stays gone.
+// already said wasn't you stays gone, and your rewrites stay yours.
 const reread = () => {
   const s = get();
   if (s.answers.length) set({ found: foundFor(s.name, s.links) });
 };
 
 export const r = {
-  reset() {
-    set({ ...FRESH });
-  },
+  reread,
   setName(name: string) {
     set({ name });
     reread();
@@ -84,7 +84,7 @@ export const r = {
   // Three answers in: read them, with the links, into a first persona.
   read(answers: string[], clips: Clip[] = []) {
     const s = get();
-    set({ answers, clips, points: pointsFrom(answers), found: foundFor(s.name, s.links), removed: [], moves: {}, fit: null, agreed: [] });
+    set({ answers, clips, points: pointsFrom(answers), found: foundFor(s.name, s.links), removed: [], fit: null, agreed: [] });
   },
   agree(id: string) {
     set((s) => ({ agreed: s.agreed.includes(id) ? s.agreed : [...s.agreed, id] }));
@@ -106,9 +106,6 @@ export const r = {
   undoNotMe() {
     set((s) => ({ removed: s.removed.slice(0, -1) }));
   },
-  move(text: string, v: "kept" | "dropped") {
-    set((s) => ({ moves: { ...s.moves, [text]: v } }));
-  },
   setFit(fit: Fit) {
     set({ fit });
   },
@@ -123,4 +120,3 @@ export const r = {
   },
 };
 
-export { MOVES };

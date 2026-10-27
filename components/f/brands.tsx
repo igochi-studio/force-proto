@@ -49,7 +49,8 @@ export const LinkMark = ({ size = 20 }: P) => (
 
 // Onairos: their mark, a head in profile, warm red at the face going to blue at the shoulders.
 export const OnairosMark = ({ size = 20 }: P) => {
-  const id = useId().replace(/:/g, "");
+  // useId can include characters (":", "«") that don't survive inside url(#…) everywhere.
+  const id = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden>
       <defs>

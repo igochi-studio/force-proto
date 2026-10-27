@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "check:words": "! grep -rniwE 'wellness|wellbeing|mental health|therapy|therapist|heal|healing|journey|boost|optimi[sz]e|cognition|cognitive|engine|atlas|sanctuary|atelier|pipeline|insights|score|streak|productivity|ai-powered|unlock|transform|the writer|users|claude|vektori|photon|supabase|inventive' data components lib"
+    "check:words": "! grep -rniwE 'wellness|wellbeing|mental health|therapy|therapist|heal|healing|journey|boost|optimi[sz]e|cognition|cognitive|engine|atlas|sanctuary|atelier|pipeline|insights|score|streak|productivity|ai-powered|unlock|transform|the writer|users|claude|vektori|photon|supabase|inventive' data components lib",
+    "test:browsers": "node scripts/browsers.mjs"
   },
   "dependencies": {
     "html2canvas": "^1.4.1",
@@ -26,6 +27,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
+    "playwright": "^1.56.1",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5"

@@ -21,7 +21,7 @@ export function NameField({ className = "" }: { className?: string }) {
   );
 }
 
-export function LinkRow({ id, kind, name, art, x, y, value, onChange }: { id: string; kind: LinkKind | "extra"; name: string; art: Art; x: number; y: number; value: string; onChange: (v: string) => void }) {
+function LinkRow({ id, kind, name, art, x, y, value, onChange }: { id: string; kind: LinkKind | "extra"; name: string; art: Art; x: number; y: number; value: string; onChange: (v: string) => void }) {
   const [focus, setFocus] = useState(false);
   const on = !!value.trim();
   const M = MARKS[kind];

@@ -28,7 +28,8 @@ export const LINKS: { kind: LinkKind; name: string; art: Art; x: number; y: numb
   { kind: "github", name: "GitHub", art: "park", x: 45, y: 35 },
   { kind: "site", name: "Website or Substack", art: "meadow", x: 55, y: 30 },
 ];
-export const ONAIROS_ART = { art: "hills" as Art, x: 25, y: 70 };
+// Your own face in the residency, until there's a photo: a crop of the park painting.
+export const ME_FACE = { art: "park" as Art, x: 45, y: 30 };
 
 // A pasted link, shown as the handle it points to: no https, no www, no trailing slash.
 export function pretty(kind: LinkKind | "extra", raw: string) {
@@ -123,13 +124,15 @@ export const HEADLINE = "A builder who learns by listening, and came here for th
 //   you: the person
 //   intent: what you want to change, accomplish or understand (the problems you care about)
 //   theme: the concepts, fields and methods around it, which is where you meet other people
-// Residents who share a theme hang off it, so the map already shows who you'd meet. Mock
-// until the agent's output lands; every intent quotes the answer it came from.
+// Residents who share a theme hang off it, so the map already shows who you'd meet. The map
+// shows each node's title (one or two words, written by the agent); opening it shows the
+// whole thought. Mock until the agent's output lands; every intent quotes its answer.
 export type NodeKind = "you" | "intent" | "theme" | "person";
 export interface WNode {
   id: string;
   kind: NodeKind;
-  label: string;
+  title: string; // one or two words: what the map shows
+  label: string; // the whole thought, for when you open it
   line?: string; // what it means, in a sentence
   from?: string; // where Force read it
   art: Art;
@@ -138,19 +141,19 @@ export interface WNode {
 export function worldFor(answers: string[], name: string): { nodes: WNode[]; edges: [string, string][] } {
   const a = answers.map((x, i) => x.trim() || SAMPLE_ANSWERS[i]);
   const nodes: WNode[] = [
-    { id: "you", kind: "you", label: name.trim().split(/\s+/)[0] || "You", art: "hills" },
-    { id: "i1", kind: "intent", label: "Fair prices for small farmers", line: "What you're building toward.", from: `Answer 1: “${clause(a[0])}”`, art: "meadow" },
-    { id: "i2", kind: "intent", label: "Learning from the people you build for", line: "How you like to work it out.", from: `Answer 2: “${clause(a[1])}”`, art: "park" },
-    { id: "i3", kind: "intent", label: "Leaving with people, not just output", line: "What would make this residency a win.", from: `Answer 3: “${clause(a[2])}”`, art: "dusk" },
-    { id: "t1", kind: "theme", label: "Agricultural markets", from: "Your answers and LinkedIn", art: "meadow" },
-    { id: "t2", kind: "theme", label: "Pricing", from: "Your answers and your essays", art: "hills" },
-    { id: "t3", kind: "theme", label: "WhatsApp-first products", from: "GitHub", art: "water" },
-    { id: "t4", kind: "theme", label: "Field research", from: "Your answers", art: "park" },
-    { id: "t5", kind: "theme", label: "Rural tech", from: "A panel you spoke on", art: "water" },
-    { id: "t6", kind: "theme", label: "Community", from: "Your answers", art: "dusk" },
-    { id: "p-meera", kind: "person", label: "Meera", person: "meera", art: "meadow" },
-    { id: "p-kabir", kind: "person", label: "Kabir", person: "kabir", art: "water" },
-    { id: "p-ananya", kind: "person", label: "Ananya", person: "ananya", art: "dusk" },
+    { id: "you", kind: "you", title: name.trim().split(/\s+/)[0] || "You", label: name.trim() || "You", art: "hills" },
+    { id: "i1", kind: "intent", title: "Fair prices", label: "Fair prices for small farmers", line: "What you're building toward.", from: `Answer 1: “${clause(a[0])}”`, art: "meadow" },
+    { id: "i2", kind: "intent", title: "Listening first", label: "Learning from the people you build for", line: "How you like to work it out.", from: `Answer 2: “${clause(a[1])}”`, art: "park" },
+    { id: "i3", kind: "intent", title: "People first", label: "Leaving with people, not just output", line: "What would make this residency a win.", from: `Answer 3: “${clause(a[2])}”`, art: "dusk" },
+    { id: "t1", kind: "theme", title: "Markets", label: "Agricultural markets", from: "Your answers and LinkedIn", art: "meadow" },
+    { id: "t2", kind: "theme", title: "Pricing", label: "Pricing", from: "Your answers and your essays", art: "hills" },
+    { id: "t3", kind: "theme", title: "WhatsApp", label: "WhatsApp-first products", from: "GitHub", art: "water" },
+    { id: "t4", kind: "theme", title: "Field research", label: "Field research", from: "Your answers", art: "park" },
+    { id: "t5", kind: "theme", title: "Rural tech", label: "Rural tech", from: "A panel you spoke on", art: "water" },
+    { id: "t6", kind: "theme", title: "Community", label: "Community", from: "Your answers", art: "dusk" },
+    { id: "p-meera", kind: "person", title: "Meera", label: "Meera", person: "meera", art: "meadow" },
+    { id: "p-kabir", kind: "person", title: "Kabir", label: "Kabir", person: "kabir", art: "water" },
+    { id: "p-ananya", kind: "person", title: "Ananya", label: "Ananya", person: "ananya", art: "dusk" },
   ];
   const edges: [string, string][] = [
     ["you", "i1"], ["you", "i2"], ["you", "i3"],

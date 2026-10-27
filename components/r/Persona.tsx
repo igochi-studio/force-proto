@@ -7,7 +7,7 @@
 // way moves are: swipe right if it's you, left if it isn't, tap to rewrite. Then how close
 // it got, and the people with this energy.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, useTransform } from "motion/react";
 import { HEADLINE, LINKS, MOVES, TRAITS, residentById, worldFor, type NodeKind, type Point } from "@/data/residency";
 import { voiceFor } from "@/lib/f/analyse";
@@ -63,7 +63,7 @@ function YouMap({ onPerson }: { onPerson: (id: string) => void }) {
               <div className="mt-3 flex flex-wrap gap-[6px]">
                 {links.map((l) => (
                   <button key={l.id} type="button" onClick={() => (haptic(), setFocus(l.id))} className="press hit h-8 rounded-full bg-fill px-3 t-label text-ink">
-                    {l.label}
+                    {l.title}
                   </button>
                 ))}
               </div>
@@ -85,6 +85,7 @@ function YouMap({ onPerson }: { onPerson: (id: string) => void }) {
 // peek: once, on arrival, the card shows you both sides by itself, the way iOS Mail does.
 function Swipe({ onRight, onLeft, right, left, children, className = "", style, peek }: { onRight?: () => void; onLeft: () => void; right?: string; left: string; children: React.ReactNode; className?: string; style?: React.CSSProperties; peek?: boolean }) {
   const x = useMotionValue(0);
+  const dragged = useRef(false); // a drag that ends over a button isn't a tap on it
   useEffect(() => {
     if (!peek) return;
     const id = setTimeout(() => animate(x, [0, 84, 84, 0, -84, -84, 0], { duration: 2.6, times: [0, 0.16, 0.34, 0.5, 0.66, 0.84, 1], ease: "easeInOut" }), 900);
@@ -108,7 +109,14 @@ function Swipe({ onRight, onLeft, right, left, children, className = "", style, 
         drag="x"
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={{ left: 0.6, right: onRight ? 0.6 : 0.05 }}
+        onDragStart={() => (dragged.current = true)}
+        onClickCapture={(e) => {
+          if (!dragged.current) return;
+          e.stopPropagation();
+          e.preventDefault();
+        }}
         onDragEnd={(_, i) => {
+          setTimeout(() => (dragged.current = false), 0);
           if (onRight && (i.offset.x > 72 || i.velocity.x > 500)) {
             haptic("done");
             onRight();
@@ -120,6 +128,17 @@ function Swipe({ onRight, onLeft, right, left, children, className = "", style, 
       >
         {children}
       </motion.div>
+      {/* The same choices without a swipe, for keyboards and screen readers */}
+      <span className="sr-only">
+        {onRight && (
+          <button type="button" onClick={onRight}>
+            {right}
+          </button>
+        )}
+        <button type="button" onClick={onLeft}>
+          {left}
+        </button>
+      </span>
     </div>
   );
 }
@@ -339,7 +358,7 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
             type="button"
             onClick={() => {
               haptic("done");
-              r.read(useR.getState().answers, useR.getState().clips);
+              r.reread();
               f.toast("Force read you again.");
             }}
             className="press mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-fill t-body font-medium text-ink"

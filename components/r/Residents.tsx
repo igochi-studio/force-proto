@@ -12,7 +12,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ART_SRC } from "@/data/mira";
-import { LINKS, RESIDENTS, type Resident } from "@/data/residency";
+import { LINKS, ME_FACE, RESIDENTS, type Resident } from "@/data/residency";
 import { f, useF } from "@/lib/f/store";
 import { r, useR } from "@/lib/f/residency";
 import Face from "../f/Face";
@@ -21,7 +21,6 @@ import Goo, { string, type Blob } from "../f/Goo";
 import { MARKS } from "../f/brands";
 import { I, Logo, SPRING, haptic } from "../f/ui";
 
-const ME_FACE = { art: "park" as const, x: 45, y: 30 };
 
 const thread = (id: string) => {
   haptic();

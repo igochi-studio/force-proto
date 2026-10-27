@@ -19,7 +19,8 @@ import type { Art } from "@/data/mira";
 
 // orb: the glass bubble the water starts from. It stays exactly where it was, still, above
 // the water, and the listening pill gives way to a quiet line over it.
-export default function VoiceMode({ origin, shotOf, onClose, limit, onClip, orb }: { origin: { x: number; y: number }; shotOf: HTMLElement | null; onClose: () => void; limit?: number; onClip?: (clip: Clip) => void; orb?: { art: Art; x: number; y: number; size: number; zoom?: number; icon?: React.ReactNode } }) {
+// onStop: you've finished; the clip follows a moment later, once the audio is read.
+export default function VoiceMode({ origin, shotOf, onClose, onStop, limit, onClip, orb }: { origin: { x: number; y: number }; shotOf: HTMLElement | null; onClose: () => void; onStop?: () => void; limit?: number; onClip?: (clip: Clip) => void; orb?: { art: Art; x: number; y: number; size: number; zoom?: number; icon?: React.ReactNode } }) {
   const cv = useRef<HTMLCanvasElement>(null);
   const [rec, setRec] = useState<Recording | null>(null);
   const [ready, setReady] = useState(false);
@@ -29,8 +30,14 @@ export default function VoiceMode({ origin, shotOf, onClose, limit, onClip, orb 
   const done = useRef(false);
   const [sample, setSample] = useState(false); // no microphone: say so quietly, in place
   const [plain, setPlain] = useState(false); // this browser can't bend the screen: rings instead
+  const closeRef = useRef(onClose);
+  const doneBtn = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    closeRef.current = onClose;
+  }, [onClose]);
 
-  // Start listening the moment you hold.
+  // Start listening the moment it opens: one recording for the life of voice mode. If it goes
+  // away without finishing or cancelling, the microphone is let go.
   useEffect(() => {
     let live = true;
     haptic("done");
@@ -43,12 +50,14 @@ export default function VoiceMode({ origin, shotOf, onClose, limit, onClip, orb 
       })
       .catch(() => {
         f.toast("Recording isn't available in this browser.");
-        onClose();
+        closeRef.current();
       });
+    doneBtn.current?.focus({ preventScroll: true });
     return () => {
       live = false;
+      if (!done.current) recRef.current?.cancel();
     };
-  }, [onClose]);
+  }, []);
 
   // Photograph the screen, then let the water run.
   useEffect(() => {
@@ -146,8 +155,10 @@ export default function VoiceMode({ origin, shotOf, onClose, limit, onClip, orb 
     done.current = true;
     const r = recRef.current;
     haptic("soft");
+    if (r) onStop?.();
     onClose();
-    if (!r) return;
+    // Finished before the microphone was allowed: say so, instead of losing it silently.
+    if (!r) return f.toast("Nothing recorded. Allow the microphone when your browser asks, or type instead.");
     const clip = await r.stop();
     if (onClip) onClip(clip);
     else f.addClip(clip);
@@ -168,6 +179,10 @@ export default function VoiceMode({ origin, shotOf, onClose, limit, onClip, orb 
   return (
     <div data-no-shot className="absolute inset-0 z-[70]" onClick={finish} role="dialog" aria-label="Voice mode. Tap anywhere to finish.">
       <canvas ref={cv} className="absolute inset-0 h-full w-full transition-opacity duration-200" style={{ opacity: ready ? 1 : 0 }} aria-hidden />
+      {/* Tapping anywhere finishes; this is the same for a keyboard or a screen reader */}
+      <button ref={doneBtn} type="button" onClick={(e) => (e.stopPropagation(), finish())} className="sr-only">
+        Finish recording
+      </button>
       <button
         type="button"
         aria-label="Cancel"
