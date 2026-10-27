@@ -38,7 +38,8 @@ function along(pts: [number, number][], u: number): [number, number] {
 
 type Stroke = { pts: [number, number][]; w0: number; w1: number; t0: number; dur: number; src: number };
 
-export default function PaintedYou({ sources, name, height = 280 }: { sources: Source[]; name?: string; height?: number }) {
+// bare: no card of its own, for when it sits inside one.
+export default function PaintedYou({ sources, name, height = 280, bare }: { sources: Source[]; name?: string; height?: number; bare?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const cv = useRef<HTMLCanvasElement>(null);
   const [w, setW] = useState(0);
@@ -198,7 +199,7 @@ export default function PaintedYou({ sources, name, height = 280 }: { sources: S
   }, [w, height, sig]);
 
   return (
-    <div ref={box} className="relative overflow-hidden rounded-[28px] bg-paper" style={{ height, boxShadow: "var(--lift-1)" }}>
+    <div ref={box} className={`relative overflow-hidden ${bare ? "" : "rounded-[28px] bg-paper"}`} style={{ height, boxShadow: bare ? undefined : "var(--lift-1)" }}>
       <canvas ref={cv} className="absolute inset-0" style={{ width: w || "100%", height }} role="img" aria-label={`${name || "You"}, painted from ${sources.map((s) => s.label).join(", ")}`} />
       {labels.map((l) => (
         <span key={l.key} className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap t-meta text-ink-3 transition-opacity duration-500" style={{ left: l.x, top: l.y, opacity: t > l.t0 ? 1 : 0 }} aria-hidden>

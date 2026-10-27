@@ -25,10 +25,11 @@ interface R {
   clips: Clip[]; // your recorded answers, for this visit only (the audio doesn't survive a refresh)
   agreed: string[]; // points you said were you
   tab: "conversations" | "people"; // which half of home is showing
+  tip: boolean; // you've seen how to correct the patterns
 }
 
 const KEY = "force.residency";
-const FRESH: R = { done: false, name: "", links: {}, extra: [], onairos: "off", answers: [], points: [], found: [], removed: [], moves: {}, fit: null, clips: [], agreed: [], tab: "conversations" };
+const FRESH: R = { done: false, name: "", links: {}, extra: [], onairos: "off", answers: [], points: [], found: [], removed: [], moves: {}, fit: null, clips: [], agreed: [], tab: "conversations", tip: false };
 
 const load = (): R => {
   try {
@@ -104,6 +105,9 @@ export const r = {
   },
   finish(tab: R["tab"] = "conversations") {
     set({ done: true, tab });
+  },
+  tipSeen() {
+    if (!get().tip) set({ tip: true });
   },
   setTab(tab: R["tab"]) {
     set({ tab });

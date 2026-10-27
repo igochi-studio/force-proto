@@ -17,8 +17,8 @@ import { I, haptic } from "./ui";
 import Glass from "./Glass";
 import type { Art } from "@/data/mira";
 
-// orb: the glass bubble the water starts from. It stays where it was, above the water,
-// breathing with your voice, and the listening pill gives way to a quiet line under it.
+// orb: the glass bubble the water starts from. It stays exactly where it was, still, above
+// the water, and the listening pill gives way to a quiet line over it.
 export default function VoiceMode({ origin, shotOf, onClose, limit, onClip, orb }: { origin: { x: number; y: number }; shotOf: HTMLElement | null; onClose: () => void; limit?: number; onClip?: (clip: Clip) => void; orb?: { art: Art; x: number; y: number; size: number; icon?: React.ReactNode } }) {
   const cv = useRef<HTMLCanvasElement>(null);
   const [rec, setRec] = useState<Recording | null>(null);
@@ -27,22 +27,6 @@ export default function VoiceMode({ origin, shotOf, onClose, limit, onClip, orb 
   const [secs, setSecs] = useState(0);
   const recRef = useRef<Recording | null>(null);
   const done = useRef(false);
-  const orbEl = useRef<HTMLSpanElement>(null);
-
-  // The orb swells a little with your voice.
-  useEffect(() => {
-    if (!orb) return;
-    let raf = 0;
-    let v = 0;
-    const tick = () => {
-      const l = recRef.current?.level() ?? 0;
-      v += (l - v) * 0.18;
-      if (orbEl.current) orbEl.current.style.scale = String(1 + Math.min(0.22, v * 0.3));
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [orb]);
 
   // Start listening the moment you hold.
   useEffect(() => {
@@ -191,7 +175,7 @@ export default function VoiceMode({ origin, shotOf, onClose, limit, onClip, orb 
       </button>
       {orb && (
         <>
-          <span ref={orbEl} className="pointer-events-none absolute" style={{ left: origin.x, top: origin.y, translate: "-50% -50%" }}>
+          <span className="pointer-events-none absolute" style={{ left: origin.x, top: origin.y, translate: "-50% -50%" }}>
             <Glass size={orb.size} art={orb.art} x={orb.x} y={orb.y} zoom={240}>
               {orb.icon}
             </Glass>

@@ -7,8 +7,8 @@
 // way moves are: swipe right if it's you, left if it isn't, tap to rewrite. Then how close
 // it got, and the people with this energy.
 
-import { useMemo, useState } from "react";
-import { AnimatePresence, motion, useMotionValue, useTransform } from "motion/react";
+import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, animate, motion, useMotionValue, useTransform } from "motion/react";
 import type { Art } from "@/data/mira";
 import { HEADLINE, LINKS, MOVES, ONAIROS_ART, TRAITS, type Point } from "@/data/residency";
 import { voiceFor } from "@/lib/f/analyse";
@@ -20,26 +20,34 @@ import { MoveRow, Voice } from "../f/Sheet";
 import { MARKS } from "../f/brands";
 import PaintedYou, { type Source } from "./PaintedYou";
 import { I, SPRING, haptic } from "../f/ui";
-import { Primary } from "./Onboarding";
 
 
 // ── You, painted ──
 // Everything Force read from becomes a stroke of its painting, and the strokes become you.
-function YouMap({ name }: { name: string }) {
+export function usePaintSources(): Source[] {
   const { links, onairos } = useR();
-  const sources: Source[] = [
+  return [
     ...LINKS.filter((l) => links[l.kind]?.trim()).map((l) => ({ key: l.kind, label: l.kind === "site" ? "Website" : l.name, art: l.art, x: l.x, y: l.y })),
     ...(onairos === "on" ? [{ key: "onairos", label: "Onairos", ...ONAIROS_ART }] : []),
     { key: "voice", label: "Your voice", art: "hills" as Art, x: 74, y: 18 },
     { key: "search", label: "What's public", art: "meadow" as Art, x: 40, y: 60 },
   ];
-  return <PaintedYou sources={sources} name={name} />;
+}
+
+function YouMap({ name }: { name: string }) {
+  return <PaintedYou sources={usePaintSources()} name={name} />;
 }
 
 // ── Swipe to say ──
 // The same gesture as a next move: pull right for "that's me", left for "not me".
-function Swipe({ onRight, onLeft, right, left, children, className = "", style }: { onRight?: () => void; onLeft: () => void; right?: string; left: string; children: React.ReactNode; className?: string; style?: React.CSSProperties }) {
+// peek: once, on arrival, the card shows you both sides by itself, the way iOS Mail does.
+function Swipe({ onRight, onLeft, right, left, children, className = "", style, peek }: { onRight?: () => void; onLeft: () => void; right?: string; left: string; children: React.ReactNode; className?: string; style?: React.CSSProperties; peek?: boolean }) {
   const x = useMotionValue(0);
+  useEffect(() => {
+    if (!peek) return;
+    const id = setTimeout(() => animate(x, [0, 84, 84, 0, -84, -84, 0], { duration: 2.6, times: [0, 0.16, 0.34, 0.5, 0.66, 0.84, 1], ease: "easeInOut" }), 900);
+    return () => clearTimeout(id);
+  }, [peek, x]);
   const rightA = useTransform(x, [0, 72], [0, 1]);
   const leftA = useTransform(x, [-72, 0], [1, 0]);
   return (
@@ -74,7 +82,7 @@ function Swipe({ onRight, onLeft, right, left, children, className = "", style }
   );
 }
 
-function PatternCard({ p, agreed }: { p: Point; agreed: boolean }) {
+function PatternCard({ p, agreed, peek }: { p: Point; agreed: boolean; peek?: boolean }) {
   const [edit, setEdit] = useState<string | null>(null);
   if (edit !== null)
     return (
@@ -100,8 +108,11 @@ function PatternCard({ p, agreed }: { p: Point; agreed: boolean }) {
       </form>
     );
   return (
-    <Swipe right="That's me" left="Not me" onRight={() => r.agree(p.id)} onLeft={() => (r.dropPoint(p.id), f.toast("Gone. Force won't use it."))} className="rounded-[28px] bg-fill p-5">
-      <button type="button" onClick={() => setEdit(p.text)} className="block w-full text-left">
+    <Swipe peek={peek} right="That's me" left="Not me" onRight={() => (r.agree(p.id), r.tipSeen())} onLeft={() => (r.dropPoint(p.id), r.tipSeen(), f.toast("Gone. Force won't use it."))} className="rounded-[28px] bg-fill p-5 pr-12">
+      <span className="pointer-events-none absolute right-4 top-5 text-ink-4" aria-hidden>
+        <I.Edit size={16} />
+      </span>
+      <button type="button" onClick={() => setEdit(p.text)} aria-label={`${p.text} Tap to rewrite.`} className="block w-full text-left">
         <span className="block t-body font-semibold text-ink">{p.text}</span>
         <span className="mt-2 block t-body text-ink-3">{p.why}</span>
         {agreed && (
@@ -112,6 +123,53 @@ function PatternCard({ p, agreed }: { p: Point; agreed: boolean }) {
         )}
       </button>
     </Swipe>
+  );
+}
+
+// How to answer Force, shown big the first time: the gestures people already know from Mail
+// and every photo app, spelled out once.
+function Tip() {
+  const seen = useR((s) => s.tip);
+  return (
+    <AnimatePresence initial={false}>
+      {!seen && (
+        <motion.div className="overflow-hidden" exit={{ opacity: 0, height: 0, transition: { duration: 0.25 } }}>
+          <div className="mb-3 rounded-[28px] bg-paper p-5" style={{ boxShadow: "var(--lift-1)" }}>
+            <p className="t-body font-semibold text-ink">Is this you?</p>
+            <p className="mt-1 t-label text-ink-3">These came from your answers. Tell Force what&apos;s right; it learns from every change.</p>
+            <ul className="mt-4 flex flex-col gap-3">
+              <li className="flex items-center gap-3 t-body text-ink">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ background: "var(--sage-1)", color: "var(--sage-7)" }}>
+                  <I.Arrow size={18} />
+                </span>
+                <span>
+                  <span className="font-medium">Swipe right</span> if it&apos;s you
+                </span>
+              </li>
+              <li className="flex items-center gap-3 t-body text-ink">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ background: "var(--rose-1)", color: "var(--rose-7)" }}>
+                  <I.Arrow size={18} className="rotate-180" />
+                </span>
+                <span>
+                  <span className="font-medium">Swipe left</span> if it isn&apos;t
+                </span>
+              </li>
+              <li className="flex items-center gap-3 t-body text-ink">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-fill text-ink-2">
+                  <I.Edit size={16} />
+                </span>
+                <span>
+                  <span className="font-medium">Tap</span> to say it your way
+                </span>
+              </li>
+            </ul>
+            <button type="button" onClick={() => (haptic(), r.tipSeen())} className="press mt-5 h-11 w-full rounded-full bg-fill t-body font-medium text-ink">
+              Got it
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -145,8 +203,10 @@ function H({ children, hint }: { children: React.ReactNode; hint?: string }) {
   );
 }
 
-export default function Persona({ onDone }: { onDone?: () => void }) {
-  const { name, points, found, removed, fit, onairos, agreed, clips, links } = useR();
+// sheet: opened from the pattern map in the conversation (its own header and Done live in the
+// sheet). Otherwise it's the You page, with a back button.
+export default function Persona({ sheet }: { sheet?: boolean }) {
+  const { name, points, found, removed, fit, onairos, agreed, clips, links, tip } = useR();
   const [own, setOwn] = useState("");
   const shown = found.filter((x) => !removed.includes(x.id));
   const first = name.trim().split(/\s+/)[0];
@@ -155,8 +215,8 @@ export default function Persona({ onDone }: { onDone?: () => void }) {
   const summary = points.length ? HEADLINE : "Force needs a little more of you first.";
 
   return (
-    <div className={onDone ? "px-4 pb-8 pt-4" : "no-scrollbar relative h-full overflow-y-auto px-4 pb-10 pt-[64px]"}>
-      {!onDone && <Nav title="You" />}
+    <div className={sheet ? "px-4 pb-8 pt-2" : "no-scrollbar relative h-full overflow-y-auto px-4 pb-10 pt-[64px]"}>
+      {!sheet && <Nav title="You" />}
 
       <YouMap name={first} />
 
@@ -167,12 +227,13 @@ export default function Persona({ onDone }: { onDone?: () => void }) {
       </p>
 
       <section className="mt-8">
-        <H hint="Swipe right if it's you, left if it isn't. Tap one to say it your way.">The patterns</H>
+        <H>The patterns</H>
+        <Tip />
         <div className="flex flex-col gap-2">
           <AnimatePresence initial={false}>
-            {points.map((p) => (
+            {points.map((p, i) => (
               <motion.div key={p.id} layout exit={{ opacity: 0, height: 0, transition: { duration: 0.25 } }} transition={SPRING.move}>
-                <PatternCard p={p} agreed={agreed.includes(p.id)} />
+                <PatternCard p={p} agreed={agreed.includes(p.id)} peek={!tip && i === 0} />
               </motion.div>
             ))}
           </AnimatePresence>
@@ -265,11 +326,6 @@ export default function Persona({ onDone }: { onDone?: () => void }) {
         {fit && fit !== "spot" && <p className="mt-3 px-1 t-label text-ink-3">Thank you. Swipe away what&apos;s off, or tap a pattern to say it your way. Force asks again after a few conversations.</p>}
       </section>
 
-      {onDone && (
-        <div className="mt-10">
-          <Primary onClick={onDone}>Find people with this energy</Primary>
-        </div>
-      )}
     </div>
   );
 }

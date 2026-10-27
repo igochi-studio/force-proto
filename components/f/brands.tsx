@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { LinkKind } from "@/data/residency";
 
 // The marks of the places people link: drawn plainly in one colour, to sit inside the glass.
@@ -46,12 +47,33 @@ export const LinkMark = ({ size = 20 }: P) => (
   </svg>
 );
 
-// Onairos: their mark isn't public yet, so a plain ring stands in.
-export const OnairosMark = ({ size = 20 }: P) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" aria-hidden>
-    <circle cx="12" cy="12" r="8" />
-    <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" />
-  </svg>
-);
+// Onairos: their mark, a head in profile, warm red at the face going to blue at the shoulders.
+export const OnairosMark = ({ size = 20 }: P) => {
+  const id = useId().replace(/:/g, "");
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden>
+      <defs>
+        <linearGradient id={`ong${id}`} x1="0.3" y1="0" x2="0.5" y2="1">
+          <stop offset="0" stopColor="#ff4a3d" />
+          <stop offset="0.42" stopColor="#ff5f45" />
+          <stop offset="0.7" stopColor="#a38fd8" />
+          <stop offset="1" stopColor="#5f95f2" />
+        </linearGradient>
+        <radialGradient id={`onh${id}`} cx="0.68" cy="0.2" r="0.32">
+          <stop offset="0" stopColor="#ffc983" stopOpacity="0.95" />
+          <stop offset="1" stopColor="#ffc983" stopOpacity="0" />
+        </radialGradient>
+        <filter id={`onb${id}`} x="-10%" y="-10%" width="120%" height="120%">
+          <feGaussianBlur stdDeviation="0.9" />
+        </filter>
+      </defs>
+      <g filter={`url(#onb${id})`}>
+        <path d={ONAIROS} fill={`url(#ong${id})`} />
+        <path d={ONAIROS} fill={`url(#onh${id})`} />
+      </g>
+    </svg>
+  );
+};
+const ONAIROS = "M64 71C72 61 76 41 70 27C64 12 46 9 37 19C33 25 33 32 32 37L28 44C27 46 29 48 32 48L32 54C32 59 36 62 43 62L45 66L45 73C33 75 20 80 12 90L8 100L100 100L96 92C90 82 78 76 66 74Z";
 
 export const MARKS: Record<LinkKind | "extra", (p: P) => React.ReactNode> = { linkedin: LinkedInMark, x: XMark, instagram: InstagramMark, github: GitHubMark, site: SiteMark, extra: LinkMark };

@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Keyboard } from "lucide-react";
 import type { Art, Clip } from "@/data/mira";
-import { LINKS, ONAIROS_ART, QUESTIONS, pretty, type LinkKind } from "@/data/residency";
+import { HEADLINE, LINKS, ONAIROS_ART, QUESTIONS, pretty, type LinkKind } from "@/data/residency";
 import { f } from "@/lib/f/store";
 import { r, useR } from "@/lib/f/residency";
 import PaintedMark from "../f/PaintedMark";
@@ -18,10 +18,11 @@ import VoiceMode from "../f/VoiceMode";
 import { AudioBubble, Bubble, Typing } from "../f/Bubbles";
 import Glass from "../f/Glass";
 import { MARKS, OnairosMark } from "../f/brands";
-import { I, Logo, haptic } from "../f/ui";
-import Persona from "./Persona";
+import { I, Logo, Paint, haptic } from "../f/ui";
+import Persona, { usePaintSources } from "./Persona";
+import PaintedYou from "./PaintedYou";
 
-type Step = "splash" | "connect" | "talk" | "persona";
+type Step = "splash" | "connect" | "talk";
 
 export function Primary({ children, onClick, disabled }: { children: React.ReactNode; onClick: () => void; disabled?: boolean }) {
   return (
@@ -75,19 +76,12 @@ export default function ResidencyOnboarding() {
         )}
         {step === "talk" && (
           <Screen k="talk">
-            <Talk onNext={() => go("persona")} />
-          </Screen>
-        )}
-        {step === "persona" && (
-          <Screen k="persona">
-            <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
-              <Persona
-                onDone={() => {
-                  haptic("done");
-                  r.finish("people");
-                }}
-              />
-            </div>
+            <Talk
+              onNext={() => {
+                haptic("done");
+                r.finish("people");
+              }}
+            />
           </Screen>
         )}
       </AnimatePresence>
@@ -96,32 +90,8 @@ export default function ResidencyOnboarding() {
 }
 
 // ── Connectors: one page ──
-// Your links float at the top as glass bubbles, empty until you add one; then its painting
-// comes in and the bubble gives a small pop. Below, one clean pill per link: paste the URL
-// and it reads back as the handle.
-
-
-// Where each bubble floats in the cluster: left as a share of the width, top in px, size.
-const CLUSTER: Record<LinkKind | "onairos", { left: string; top: number; size: number; t: number }> = {
-  linkedin: { left: "4%", top: 22, size: 78, t: 6.2 },
-  instagram: { left: "38%", top: 0, size: 96, t: 7 },
-  x: { left: "28%", top: 112, size: 58, t: 5.4 },
-  github: { left: "64%", top: 104, size: 70, t: 6.6 },
-  site: { left: "77%", top: 8, size: 58, t: 5.8 },
-  onairos: { left: "6%", top: 128, size: 50, t: 6.8 },
-};
-
-function Floater({ on, spin, size, left, top, t, label, onTap, children, ...g }: { on: boolean; spin?: boolean; size: number; left: string; top: number; t: number; label: string; onTap: () => void; children: React.ReactNode; art: Art; x: number; y: number }) {
-  return (
-    <motion.button type="button" aria-label={label} onClick={onTap} className="absolute rounded-full" style={{ left, top }} animate={{ y: [0, -6, 0] }} transition={{ duration: t, repeat: Infinity, ease: "easeInOut" }}>
-      <motion.span className="block" animate={{ scale: on ? [1, 1.14, 1] : 1 }} transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }} whileTap={{ scale: 0.92 }}>
-        <Glass size={size} dim={!on} spin={spin} zoom={240} {...g}>
-          {children}
-        </Glass>
-      </motion.span>
-    </motion.button>
-  );
-}
+// One clean pill per link, its glass bubble holding a crop of a painting and the place's
+// mark. Paste the URL and it reads back as the handle. Then Onairos.
 
 function LinkRow({ id, kind, name, art, x, y, value, onChange }: { id: string; kind: LinkKind | "extra"; name: string; art: Art; x: number; y: number; value: string; onChange: (v: string) => void }) {
   const [focus, setFocus] = useState(false);
@@ -130,8 +100,8 @@ function LinkRow({ id, kind, name, art, x, y, value, onChange }: { id: string; k
   const canPaste = typeof navigator !== "undefined" && !!navigator.clipboard?.readText;
   return (
     <label className="flex h-[60px] items-center gap-3 rounded-full bg-paper pl-[10px] pr-4 transition-shadow duration-300" style={{ boxShadow: focus ? "var(--lift-2)" : "var(--lift-1)" }}>
-      <motion.span animate={{ scale: on ? [1, 1.12, 1] : 1 }} transition={{ duration: 0.45, ease: [0.23, 1, 0.32, 1] }}>
-        <Glass size={40} art={art} x={x} y={y} dim={!on} zoom={300}>
+      <motion.span animate={{ scale: on ? [1, 1.1, 1] : 1 }} transition={{ duration: 0.45, ease: [0.23, 1, 0.32, 1] }}>
+        <Glass size={40} art={art} x={x} y={y} zoom={300}>
           <M size={16} />
         </Glass>
       </motion.span>
@@ -194,23 +164,7 @@ function Connect({ onNext }: { onNext: () => void }) {
   return (
     <>
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-6">
-        {/* Your links, floating */}
-        <div className="relative mx-auto mt-4 h-[188px] w-full max-w-[380px]">
-          {LINKS.map((l) => {
-            const M = MARKS[l.kind];
-            const c = CLUSTER[l.kind];
-            return (
-              <Floater key={l.kind} on={!!links[l.kind]?.trim()} label={l.name} onTap={() => focusLink(l.kind)} art={l.art} x={l.x} y={l.y} {...c}>
-                <M size={Math.round(c.size * 0.32)} />
-              </Floater>
-            );
-          })}
-          <Floater on={onairos === "on"} spin={onairos === "busy"} label="Onairos" onTap={() => document.getElementById("onairos")?.scrollIntoView({ block: "center", behavior: "smooth" })} {...ONAIROS_ART} {...CLUSTER.onairos}>
-            <OnairosMark size={16} />
-          </Floater>
-        </div>
-
-        <header className="px-1 pb-5 pt-4">
+        <header className="px-1 pb-6 pt-10">
           <h1 className="t-large text-ink">Connect what&apos;s yours</h1>
           <p className="mt-2 t-body text-ink-3">Paste your links. Force reads what&apos;s public to get a first sense of you.</p>
         </header>
@@ -231,28 +185,28 @@ function Connect({ onNext }: { onNext: () => void }) {
           <I.Plus size={16} /> Add another link
         </button>
 
-        <div id="onairos" className="mt-4 rounded-[28px] bg-paper p-4" style={{ boxShadow: "var(--lift-1)" }}>
-          <div className="flex items-center gap-3">
-            <Glass size={48} dim={onairos === "off"} spin={onairos === "busy"} zoom={300} {...ONAIROS_ART}>
-              <OnairosMark size={18} />
-            </Glass>
-            <span className="min-w-0 flex-1">
-              <span className="block t-nav text-ink">Onairos</span>
-              <span className="block t-label text-ink-3">ChatGPT, Instagram, YouTube and more</span>
+        <div id="onairos" className="mt-6 rounded-[28px] bg-paper p-5" style={{ boxShadow: "var(--lift-1)" }}>
+          <div className="flex items-center gap-4">
+            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full" style={{ background: "linear-gradient(160deg, #fff4ee, #eef3fe)" }}>
+              <OnairosMark size={40} />
             </span>
-            <button type="button" onClick={() => (haptic(), r.connectOnairos())} disabled={onairos !== "off"} className={`press h-9 shrink-0 rounded-full px-4 t-label font-medium transition-colors duration-300 ${onairos === "on" ? "bg-fill text-ink" : "bg-ink text-paper"} disabled:opacity-100`}>
-              {onairos === "on" ? (
-                <span className="flex items-center gap-1">
-                  <I.Check size={14} /> Connected
-                </span>
-              ) : onairos === "busy" ? (
-                "Connecting…"
-              ) : (
-                "Connect"
-              )}
-            </button>
+            <span className="min-w-0 flex-1">
+              <span className="block t-body font-semibold text-ink">Onairos</span>
+              <span className="block t-label text-ink-3">Your ChatGPT, Instagram and YouTube, even the private parts</span>
+            </span>
           </div>
-          <p className="mt-3 rounded-[18px] bg-fill px-4 py-3 t-label text-ink-2">Reads even private accounts and hands Force a short read of your personality. Force never sees your chats or posts.</p>
+          <p className="mt-4 t-label text-ink-2">Force gets a short read of your personality from it. Never your chats or posts.</p>
+          <button type="button" onClick={() => (haptic(), r.connectOnairos())} disabled={onairos !== "off"} className={`press mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-full t-body font-medium transition-colors duration-300 ${onairos === "on" ? "bg-fill text-ink" : "bg-ink text-paper"} disabled:opacity-100`}>
+            {onairos === "on" ? (
+              <>
+                <I.Check size={16} /> Connected
+              </>
+            ) : onairos === "busy" ? (
+              "Connecting…"
+            ) : (
+              "Connect with Onairos"
+            )}
+          </button>
         </div>
       </div>
       <div className="shrink-0 px-4 pb-3 pt-2">
@@ -264,7 +218,7 @@ function Connect({ onNext }: { onNext: () => void }) {
 
 // ── The three questions ──
 
-type Line = { id: string; from: "force" | "me"; text?: string; clip?: Clip; reading?: boolean };
+type Line = { id: string; from: "force" | "me"; text?: string; clip?: Clip; reading?: boolean; map?: boolean };
 const LIMIT = 90;
 // The recorder: a glass bubble with the dusk painting in it.
 const ORB = { art: "hills" as Art, x: 74, y: 18, size: 76 };
@@ -276,6 +230,8 @@ function Talk({ onNext }: { onNext: () => void }) {
   const [qi, setQi] = useState(0);
   const [phase, setPhase] = useState<"ask" | "reading" | "done">("ask");
   const [voice, setVoice] = useState<{ x: number; y: number; el: HTMLElement | null } | null>(null);
+  const [open, setOpen] = useState(false);
+  const mapped = useRef(false);
   const answers = useRef<string[]>([]);
   const clips = useRef<Clip[]>([]);
   const list = useRef<HTMLUListElement>(null);
@@ -327,6 +283,15 @@ function Talk({ onNext }: { onNext: () => void }) {
     f.keepTexts(lines.filter((l) => l.from === "me" && l.text).map((l) => l.text!).concat(a.text ? [a.text] : []));
   };
 
+  // Read: the pattern map arrives in the conversation, the way the world used to.
+  const read = async () => {
+    if (mapped.current) return;
+    mapped.current = true;
+    setLines((l) => [...l, { id: "map", from: "force", map: true }]);
+    await say("That's my first read of you. Tap it to open it up: keep what's true, fix what isn't.", 1100);
+    setPhase("done");
+  };
+
   // The water starts from the middle of the bubble.
   const listen = (el: HTMLElement) => {
     const b = el.getBoundingClientRect();
@@ -350,13 +315,15 @@ function Talk({ onNext }: { onNext: () => void }) {
         </li>
         {lines.map((m, i) => {
           const prev = lines[i - 1];
-          const first = !prev || prev.from !== m.from || !!prev.reading;
+          const first = !prev || prev.from !== m.from || !!prev.reading || !!prev.map;
           const nextL = lines[i + 1];
-          const last = !nextL || nextL.from !== m.from || !!nextL.reading;
+          const last = !nextL || nextL.from !== m.from || !!nextL.reading || !!nextL.map;
           return (
-            <motion.li key={m.id} layout="position" className={`flex ${m.reading ? "justify-center" : m.from === "me" ? "justify-end" : "justify-start"} ${first ? "mt-3" : ""}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", duration: 0.4, bounce: 0 }}>
-              {m.reading ? (
-                <Reading sources={sources} onDone={() => setPhase("done")} />
+            <motion.li key={m.id} layout="position" className={`flex ${m.reading ? "justify-center" : m.from === "me" ? "justify-end" : "justify-start"} ${first || m.map ? "mt-3" : ""}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", duration: 0.4, bounce: 0 }}>
+              {m.map ? (
+                <MapCard onOpen={() => (haptic("soft"), setOpen(true))} />
+              ) : m.reading ? (
+                <Reading sources={sources} onDone={read} />
               ) : m.clip ? (
                 <AudioBubble clip={m.clip} />
               ) : (
@@ -374,11 +341,10 @@ function Talk({ onNext }: { onNext: () => void }) {
         )}
       </ul>
 
-      <div className="shrink-0 px-4 pb-3 pt-1">
+      {/* Kept out of the photograph the water bends, so the orb never wobbles under itself */}
+      <div data-no-shot className="shrink-0 px-4 pb-3 pt-1">
         {phase === "done" ? (
-          <Primary onClick={onNext}>
-            See what Force found <I.Arrow size={18} />
-          </Primary>
+          <Primary onClick={onNext}>Find people with this energy</Primary>
         ) : phase === "ask" ? (
           <Answer key={qi} disabled={typing || !!voice} onListen={listen} onAnswer={answered} />
         ) : (
@@ -399,7 +365,67 @@ function Talk({ onNext }: { onNext: () => void }) {
           />
         )}
       </AnimatePresence>
+      <AnimatePresence>{open && <MapSheet key="map" onClose={() => setOpen(false)} />}</AnimatePresence>
     </div>
+  );
+}
+
+// The pattern map, in the conversation: you, painted, and the one line. Tap to open it up.
+function MapCard({ onOpen }: { onOpen: () => void }) {
+  const points = useR((s) => s.points);
+  return (
+    <button type="button" onClick={onOpen} className="press block w-full overflow-hidden rounded-[24px] bg-paper text-left" style={{ boxShadow: "var(--lift-1)" }}>
+      <span className="flex items-center justify-between px-4 pt-3">
+        <span className="flex items-center gap-2 t-label font-medium text-ink-2">
+          <Paint name="pattern-maps" h={16} /> Pattern map
+        </span>
+        <span className="grid h-8 w-8 place-items-center rounded-full bg-fill text-ink" aria-hidden>
+          <I.Expand size={14} />
+        </span>
+      </span>
+      <PaintedYou sources={usePaintSources()} height={220} bare />
+      <span className="block px-4 pb-4">
+        <span className="block t-body font-semibold text-ink">{HEADLINE}</span>
+        <span className="mt-1 block t-label text-ink-3">{points.length} patterns about you · tap to open</span>
+      </span>
+    </button>
+  );
+}
+
+// Opened up: the whole pattern map, as a sheet over the conversation.
+function MapSheet({ onClose }: { onClose: () => void }) {
+  return (
+    <motion.div className="absolute inset-0 z-[75]">
+      <motion.div className="absolute inset-0 bg-[var(--scrim)]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} onClick={onClose} />
+      <motion.section
+        role="dialog"
+        aria-modal="true"
+        aria-label="Pattern map"
+        className="absolute inset-x-0 bottom-0 top-3 flex flex-col overflow-hidden bg-canvas"
+        style={{ borderRadius: "32px 32px 0 0", boxShadow: "var(--lift-2)" }}
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%", transition: { type: "spring", duration: 0.4, bounce: 0 } }}
+        transition={{ type: "spring", duration: 0.5, bounce: 0 }}
+      >
+        <div className="mx-auto mt-2 h-[5px] w-9 shrink-0 rounded-full bg-[var(--grey-300)]" />
+        <header className="grid shrink-0 grid-cols-[44px_1fr_44px] items-center gap-2 px-4 pb-2 pt-2">
+          <span aria-hidden />
+          <h2 className="flex items-center justify-center gap-2 t-nav text-ink">
+            <Paint name="pattern-maps" h={18} className="text-ink-2" /> Pattern map
+          </h2>
+          <button type="button" aria-label="Close" onClick={onClose} className="press hit grid h-11 w-11 place-items-center rounded-full bg-fill text-ink">
+            <I.Close size={18} />
+          </button>
+        </header>
+        <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
+          <Persona sheet />
+        </div>
+        <div className="shrink-0 px-4 pb-3 pt-2">
+          <Primary onClick={onClose}>Done</Primary>
+        </div>
+      </motion.section>
+    </motion.div>
   );
 }
 
@@ -477,9 +503,7 @@ function Answer({ disabled, onListen, onAnswer }: { disabled: boolean; onListen:
         disabled={disabled}
         onClick={(e) => onListen(e.currentTarget)}
         className="rounded-full"
-        animate={disabled ? { scale: 1 } : { scale: [1, 1.035, 1] }}
-        transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
-        whileTap={{ scale: 0.93 }}
+        whileTap={{ scale: 0.94 }}
       >
         <Glass {...ORB} zoom={240}>
           <I.Mic size={26} />
