@@ -429,3 +429,92 @@ textarea {
 .device[data-kb] {
   --sab: 0px;
 }
+
+/* ── Glass ────────────────────────────────────────────────────────────
+   A clear glass bubble with an oil painting inside: the painting slightly magnified, the
+   way a lens does; an oil-slick rim; a soft window highlight top-left and a bounce of light
+   at the bottom. Sized with font-size so every layer scales with it. */
+.glass {
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  isolation: isolate;
+  background: #eef0f4;
+  box-shadow:
+    0 0.04em 0.08em rgba(28, 27, 26, 0.1),
+    0 0.16em 0.32em -0.08em rgba(28, 27, 26, 0.22),
+    inset 0 0 0 0.012em rgba(255, 255, 255, 0.7);
+}
+.glass > .g-img {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background-repeat: no-repeat;
+  transform: scale(1.12);
+  filter: saturate(1.2) contrast(1.04);
+  transition: filter 600ms var(--ease-out), opacity 600ms var(--ease-out), transform 600ms var(--ease-out);
+}
+/* Empty: the glass is there, the painting hasn't come in yet */
+.glass.g-dim > .g-img {
+  filter: grayscale(1) brightness(1.18) contrast(0.7);
+  opacity: 0.45;
+  transform: scale(1.3);
+}
+.glass > .g-mark {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  filter: drop-shadow(0 0.02em 0.04em rgba(20, 20, 40, 0.45)) drop-shadow(0 0 0.1em rgba(20, 20, 40, 0.2));
+  transition: color 400ms var(--ease-out), filter 400ms var(--ease-out);
+}
+.glass.g-dim > .g-mark {
+  color: var(--grey-600);
+  filter: none;
+}
+/* The oil-slick rim: a ring of thin-film colour, brightest where the light catches it */
+.glass > .g-rim {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: 50%;
+  background: conic-gradient(from 210deg, #ff9fd2, #ffd27a, #b7f5c8, #8fd3ff, #b9a3ff, #ff9fd2);
+  -webkit-mask-image: radial-gradient(circle, transparent 58%, #000 76%, #000 100%);
+  mask-image: radial-gradient(circle, transparent 58%, #000 76%, #000 100%);
+  mix-blend-mode: soft-light;
+  opacity: 0.9;
+}
+.glass.g-spin > .g-rim {
+  animation: g-spin 1.6s linear infinite;
+  mix-blend-mode: normal;
+  opacity: 0.75;
+}
+@keyframes g-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+/* Depth: darker toward the edge, the window highlight, the bounce light */
+.glass > .g-shine {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 34% 22% at 32% 20%, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.35) 55%, rgba(255, 255, 255, 0) 100%),
+    radial-gradient(ellipse 40% 18% at 50% 92%, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 100%),
+    radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0) 52%, rgba(30, 30, 60, 0.18) 78%, rgba(30, 30, 60, 0.38) 100%);
+  box-shadow:
+    inset 0 0.03em 0.06em rgba(255, 255, 255, 0.8),
+    inset 0 -0.05em 0.12em rgba(30, 30, 60, 0.18);
+}
+@media (prefers-reduced-motion: reduce) {
+  .glass.g-spin > .g-rim {
+    animation: none;
+  }
+}

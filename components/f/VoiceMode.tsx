@@ -14,8 +14,12 @@ import { f } from "@/lib/f/store";
 import { record, type Recording } from "@/lib/f/audio";
 import { water, type Water } from "@/lib/f/ripple";
 import { I, haptic } from "./ui";
+import Glass from "./Glass";
+import type { Art } from "@/data/mira";
 
-export default function VoiceMode({ origin, shotOf, onClose, limit, onClip }: { origin: { x: number; y: number }; shotOf: HTMLElement | null; onClose: () => void; limit?: number; onClip?: (clip: Clip) => void }) {
+// orb: the glass bubble the water starts from. It stays where it was, above the water,
+// breathing with your voice, and the listening pill gives way to a quiet line under it.
+export default function VoiceMode({ origin, shotOf, onClose, limit, onClip, orb }: { origin: { x: number; y: number }; shotOf: HTMLElement | null; onClose: () => void; limit?: number; onClip?: (clip: Clip) => void; orb?: { art: Art; x: number; y: number; size: number; icon?: React.ReactNode } }) {
   const cv = useRef<HTMLCanvasElement>(null);
   const [rec, setRec] = useState<Recording | null>(null);
   const [ready, setReady] = useState(false);
@@ -23,6 +27,22 @@ export default function VoiceMode({ origin, shotOf, onClose, limit, onClip }: { 
   const [secs, setSecs] = useState(0);
   const recRef = useRef<Recording | null>(null);
   const done = useRef(false);
+  const orbEl = useRef<HTMLSpanElement>(null);
+
+  // The orb swells a little with your voice.
+  useEffect(() => {
+    if (!orb) return;
+    let raf = 0;
+    let v = 0;
+    const tick = () => {
+      const l = recRef.current?.level() ?? 0;
+      v += (l - v) * 0.18;
+      if (orbEl.current) orbEl.current.style.scale = String(1 + Math.min(0.22, v * 0.3));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [orb]);
 
   // Start listening the moment you hold.
   useEffect(() => {
@@ -169,8 +189,27 @@ export default function VoiceMode({ origin, shotOf, onClose, limit, onClip }: { 
       >
         <I.Close size={18} />
       </button>
+      {orb && (
+        <>
+          <span ref={orbEl} className="pointer-events-none absolute" style={{ left: origin.x, top: origin.y, translate: "-50% -50%" }}>
+            <Glass size={orb.size} art={orb.art} x={orb.x} y={orb.y} zoom={240}>
+              {orb.icon}
+            </Glass>
+          </span>
+          <p className="pointer-events-none absolute inset-x-0 text-center t-label text-ink-2 transition-opacity duration-300" style={{ top: origin.y - orb.size / 2 - 36, opacity: settled ? 1 : 0 }}>
+            {rec ? (
+              <>
+                <span className="t-num text-ink-3">{limit ? `${Math.max(0, limit - secs)}s` : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`}</span>
+                <span className="mx-2 text-ink-4">·</span>Listening. Tap anywhere when you&apos;re done.
+              </>
+            ) : (
+              "One moment"
+            )}
+          </p>
+        </>
+      )}
       {/* Once the first wave has crossed, the field becomes the listening pill */}
-      <div className="pointer-events-none absolute inset-x-4 flex h-[52px] items-center justify-between rounded-[26px] bg-paper px-5 transition-opacity duration-300" style={{ bottom: "calc(var(--sab) + 8px)", boxShadow: "var(--lift-1)", opacity: settled ? 1 : 0 }}>
+      <div className="pointer-events-none absolute inset-x-4 flex h-[52px] items-center justify-between rounded-[26px] bg-paper px-5 transition-opacity duration-300" style={{ bottom: "calc(var(--sab) + 8px)", boxShadow: "var(--lift-1)", opacity: settled && !orb ? 1 : 0 }}>
         <span className="flex items-center gap-2 t-body font-medium text-ink">
           <span className="relative flex h-2 w-2">
             <span className={`absolute inset-0 rounded-full ${rec ? "bg-blue" : "bg-ink-4"}`} />

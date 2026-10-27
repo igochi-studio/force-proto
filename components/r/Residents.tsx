@@ -1,19 +1,26 @@
 "use client";
 
-// Home, for the residency: the conversations. Force first, because talking to it is how your
-// memory grows. Then the side quests Force suggests with people here, then everyone in the
-// residency, the ones who share a pattern with you on top.
+// Home, for the residency. Two tabs, the way the energy page always started:
+//   Conversations: Force first, then everyone here, open threads on top.
+//   People: the energy map. You low in the middle, everyone in the residency strung to you in
+//   their painting, the shorter the strand the nearer their patterns are to yours. Tap
+//   someone and their card grows out of them: what they're on, what you share, where else
+//   they are, and a way to talk.
+// Under both, the side quests Force suggests, as painted covers.
 
-import { RESIDENTS } from "@/data/residency";
-import { MIRA_FACE } from "@/data/social";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { ART_SRC } from "@/data/mira";
+import { LINKS, RESIDENTS, type Resident } from "@/data/residency";
 import { f, useF } from "@/lib/f/store";
-import { useR } from "@/lib/f/residency";
+import { r, useR } from "@/lib/f/residency";
 import Face from "../f/Face";
-import { I, Logo, haptic } from "../f/ui";
+import Glass from "../f/Glass";
+import Goo, { string, type Blob } from "../f/Goo";
+import { MARKS } from "../f/brands";
+import { I, Logo, SPRING, haptic } from "../f/ui";
 
-const card = { boxShadow: "var(--lift-1)" };
-
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const ME_FACE = { art: "park" as const, x: 45, y: 30 };
 
 const thread = (id: string) => {
   haptic();
@@ -21,80 +28,238 @@ const thread = (id: string) => {
   f.push({ name: "dm", id });
 };
 
-export default function Residents() {
-  const dms = useF((s) => s.dms);
-  const name = useR((s) => s.name);
-  const people = [...RESIDENTS].sort((a, b) => Number(!!b.pattern) - Number(!!a.pattern));
-  const quests = RESIDENTS.filter((p) => p.pattern).slice(0, 2);
-  const last = (id: string) => {
-    const m = dms[id];
-    const x = m?.[m.length - 1];
-    return x ? (x.from === "me" ? `You: ${x.text}` : x.text) : null;
-  };
+type Tab = "conversations" | "people";
 
+export default function Residents() {
+  const tab = useR((s) => s.tab);
+  const name = useR((s) => s.name);
   return (
     <div className="absolute inset-0 flex flex-col overflow-hidden" style={{ paddingTop: "var(--sat)", paddingBottom: "var(--sab)" }}>
-      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-8">
-        <header className="flex items-center justify-between gap-3 px-1 pb-2 pt-6">
-          <span className="min-w-0">
-            <h1 className="t-large text-ink">Conversations</h1>
-            <p className="mt-1 t-label text-ink-3">The residency · {RESIDENTS.length + 1} people on Force</p>
-          </span>
-          <button type="button" aria-label={`${name || "You"}: your persona`} onClick={() => (haptic(), f.push({ name: "persona" }))} className="press pill h-11 w-11 shrink-0 justify-center p-0">
-            <Face face={MIRA_FACE} size={34} />
-          </button>
-        </header>
-
-        <button type="button" onClick={() => (haptic(), f.push({ name: "force" }))} className="press mt-4 flex w-full items-center gap-3 rounded-[28px] bg-paper p-4 text-left" style={card}>
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-ink text-paper">
-            <Logo size={24} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block t-nav text-ink">Force</span>
-            <span className="block t-label text-ink-3">Talk, type or add a photo. It all becomes your memory.</span>
-          </span>
-          <I.Chevron size={18} className="shrink-0 text-ink-4" />
+      <header className="flex h-[60px] shrink-0 items-center gap-3 px-4 pt-2">
+        <div className="flex h-11 flex-1 rounded-full bg-paper p-1" style={{ boxShadow: "var(--lift-1)" }} role="tablist">
+          {(["conversations", "people"] as Tab[]).map((t) => (
+            <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => (haptic(), r.setTab(t))} className={`relative flex-1 rounded-full t-label font-medium transition-colors duration-200 ${tab === t ? "text-paper" : "text-ink-2"}`}>
+              {tab === t && <motion.span layoutId="home-tab" className="absolute inset-0 rounded-full bg-ink" transition={SPRING.ui} />}
+              <span className="relative">{t === "conversations" ? "Conversations" : "People"}</span>
+            </button>
+          ))}
+        </div>
+        <button type="button" aria-label={`${name || "You"}: who Force thinks you are`} onClick={() => (haptic(), f.push({ name: "persona" }))} className="press shrink-0 rounded-full">
+          <Glass size={44} {...ME_FACE} zoom={260} />
         </button>
+      </header>
 
-        <h2 className="mt-8 px-1 t-title text-ink">Side quests for you</h2>
-        <ul className="mt-3 flex flex-col gap-2">
-          {quests.map((p, i) => (
-            <li key={p.id}>
-              <button type="button" onClick={() => thread(p.id)} className="press flex w-full gap-3 rounded-[28px] bg-fill p-4 text-left">
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-paper t-label font-medium text-ink">{i + 1}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block t-body text-ink">{cap(p.together.split("Side quest: ")[1] ?? p.together)}</span>
-                  <span className="mt-2 flex items-center gap-2 t-label text-ink-3">
-                    <Face face={p.face} size={20} /> With {p.name} · {p.pattern}
+      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-4">
+        {tab === "conversations" ? <Conversations /> : <People />}
+        <SideQuests />
+      </div>
+    </div>
+  );
+}
+
+// ── Conversations ──
+
+function Row({ onClick, icon, title, line, tag }: { onClick: () => void; icon: React.ReactNode; title: string; line: string; tag?: string }) {
+  return (
+    <button type="button" onClick={onClick} className="press flex h-[68px] w-full items-center gap-3 rounded-full bg-paper pl-3 pr-4 text-left" style={{ boxShadow: "var(--lift-1)" }}>
+      {icon}
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2">
+          <span className="truncate t-body font-medium text-ink">{title}</span>
+          {tag && <span className="shrink-0 rounded-full bg-fill px-2 py-[1px] t-meta text-ink-2">{tag}</span>}
+        </span>
+        <span className="block truncate t-label text-ink-3">{line}</span>
+      </span>
+      <I.Chevron size={16} className="shrink-0 text-ink-4" />
+    </button>
+  );
+}
+
+function Conversations() {
+  const dms = useF((s) => s.dms);
+  const last = (id: string) => {
+    const m = dms[id];
+    const x = m ? ([...m].reverse().find((y) => y.from !== "force") ?? m[m.length - 1]) : null;
+    return x ? (x.from === "me" ? `You: ${x.text}` : x.text) : null;
+  };
+  // Threads you've opened first, then the ones nearest your patterns, then everyone.
+  const people = [...RESIDENTS].sort((a, b) => Number(!!dms[b.id]) - Number(!!dms[a.id]) || b.energy - a.energy);
+  return (
+    <ul className="flex flex-col gap-2">
+      <li>
+        <Row
+          onClick={() => (haptic(), f.push({ name: "force" }))}
+          icon={
+            <Glass size={44} art="dusk" x={40} y={40} zoom={300}>
+              <Logo size={20} />
+            </Glass>
+          }
+          title="Force"
+          line="Talk, type or add a photo. It all becomes memory."
+        />
+      </li>
+      {people.map((p) => (
+        <li key={p.id}>
+          <Row onClick={() => thread(p.id)} icon={<Face face={p.face} size={44} />} title={p.name} line={last(p.id) ?? p.work} tag={p.pattern ? "Same pattern" : undefined} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// ── People: the energy map ──
+
+const H = 440;
+const ME_Y = 0.7;
+
+function People() {
+  const box = useRef<HTMLDivElement>(null);
+  const [w, setW] = useState(361);
+  const [focus, setFocus] = useState<string | null>(null);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setW(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const { spots, blobs } = useMemo(() => {
+    const k = H / w;
+    const n = RESIDENTS.length;
+    const me: Blob = { x: 0.5, y: ME_Y, r: 0, art: ME_FACE.art };
+    const blobs: Blob[] = [];
+    const spots = RESIDENTS.map((p, i) => {
+      const slot = i % 2 === 0 ? i / 2 : n - 1 - (i - 1) / 2;
+      const a = -Math.PI + 0.3 + ((slot + 0.5) / n) * (Math.PI - 0.6);
+      const e = p.pattern ? p.energy : 0.35 + ((i * 7) % 5) * 0.05;
+      const d = 0.26 + (1 - e) * 0.56;
+      const x = Math.max(0.12, Math.min(0.88, 0.5 + Math.cos(a) * d * k));
+      const y = Math.max(0.12, ME_Y + Math.sin(a) * d);
+      const dim = (focus && focus !== p.id ? 0.3 : 1) * (0.55 + e * 0.45);
+      blobs.push(...string(me, { x, y, r: 0, art: p.face.art }, p.face.art, Math.round(10 + d * 30), 0.007 + e * 0.007).map((b) => ({ ...b, a: dim })));
+      return { p, x, y };
+    });
+    return { spots, blobs };
+  }, [w, focus]);
+  const picked = spots.find((s) => s.p.id === focus) ?? null;
+
+  return (
+    <div
+      ref={box}
+      className="relative overflow-hidden rounded-[28px] bg-paper"
+      style={{ height: H, boxShadow: "var(--lift-1)" }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget || (e.target as HTMLElement).tagName === "CANVAS") setFocus(null);
+      }}
+    >
+      <Goo blobs={blobs} w={w} h={H} className="absolute inset-0" />
+      <span className="pointer-events-none absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center" style={{ left: "50%", top: `${ME_Y * 100}%` }}>
+        <Glass size={60} {...ME_FACE} zoom={240} />
+        <span className="mt-1 t-meta text-ink-3">You</span>
+      </span>
+      {spots.map(({ p, x, y }) => {
+        const on = focus === p.id;
+        return (
+          <button
+            key={p.id}
+            type="button"
+            aria-label={p.name}
+            aria-pressed={on}
+            onClick={() => (haptic(), setFocus(on ? null : p.id))}
+            className="press absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center transition-opacity duration-300"
+            style={{ left: `${x * 100}%`, top: `${y * 100}%`, opacity: focus && !on ? 0.35 : 1 }}
+          >
+            <Face face={p.face} size={p.pattern ? 46 : 38} />
+            <span className={`mt-1 whitespace-nowrap rounded-full px-2 py-[2px] t-meta font-medium ${on ? "bg-ink text-paper" : "bg-paper text-ink"}`} style={on ? undefined : { boxShadow: "var(--lift-1)" }}>
+              {p.name}
+            </span>
+          </button>
+        );
+      })}
+      <AnimatePresence>
+        {picked ? (
+          <Card key={picked.p.id} p={picked.p} x={picked.x * w} y={picked.y * H} />
+        ) : (
+          <motion.span key="hint" className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-fill px-3 py-[6px] t-meta text-ink-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            Shorter strand, nearer pattern · tap someone
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// Their card docks at the bottom of the map and grows out of the face you tapped.
+function Card({ p, x, y }: { p: Resident; x: number; y: number }) {
+  return (
+    <motion.div
+      className="absolute inset-x-3 bottom-3 rounded-[24px] bg-paper p-4"
+      style={{ boxShadow: "var(--lift-2)", transformOrigin: `${x - 12}px ${y - (H - 12)}px` }}
+      initial={{ opacity: 0, scale: 0.4 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.6, transition: { duration: 0.18 } }}
+      transition={SPRING.move}
+    >
+      <div className="flex items-start gap-3">
+        <span className="min-w-0 flex-1">
+          <span className="block t-body font-semibold text-ink">{p.name}</span>
+          <span className="block t-label text-ink-3">{p.work}</span>
+        </span>
+        <span className="flex shrink-0 gap-1">
+          {p.socials.map((k) => {
+            const l = LINKS.find((x) => x.kind === k)!;
+            const M = MARKS[k];
+            return (
+              <button key={k} type="button" aria-label={`${p.name} on ${l.name}`} onClick={() => f.toast(`Opens ${p.name}'s ${l.name}`)} className="press rounded-full">
+                <Glass size={30} art={l.art} x={l.x} y={l.y} zoom={320}>
+                  <M size={12} />
+                </Glass>
+              </button>
+            );
+          })}
+        </span>
+      </div>
+      {p.pattern && <p className="mt-3 rounded-[16px] bg-fill px-3 py-2 t-label text-ink">{p.pattern}</p>}
+      <button type="button" onClick={() => thread(p.id)} className="press pill-ink mt-3 h-11 w-full justify-center t-body font-medium">
+        Message {p.name}
+      </button>
+    </motion.div>
+  );
+}
+
+// ── Side quests, as painted covers ──
+
+function SideQuests() {
+  const quests = RESIDENTS.filter((p) => p.quest);
+  const odd = quests.length % 2 === 1;
+  return (
+    <section className="mt-10">
+      <h2 className="mb-3 px-1 t-body text-ink-3">Side quests Force suggests</h2>
+      <ul className="grid grid-cols-2 gap-3">
+        {quests.map((p, i) => {
+          const wide = odd && i === quests.length - 1;
+          return (
+            <li key={p.id} className={wide ? "col-span-2" : ""}>
+              <button
+                type="button"
+                onClick={() => thread(p.id)}
+                className={`press relative block w-full overflow-hidden rounded-[24px] bg-cover text-left ${wide ? "aspect-[2/1]" : "aspect-[4/5]"}`}
+                style={{ backgroundImage: `url(${ART_SRC[p.face.art]})`, backgroundPosition: `${p.face.x}% ${p.face.y}%`, boxShadow: "var(--lift-1)" }}
+              >
+                <span className="absolute inset-0 grid place-items-center p-3">
+                  <span className="max-w-full rounded-[16px] px-3 py-[6px] text-center t-label font-medium text-paper backdrop-blur-md" style={{ background: "rgb(28 27 26 / 0.28)" }}>
+                    {p.quest}
                   </span>
+                </span>
+                <span className="absolute bottom-3 left-3 flex items-center gap-[6px] rounded-full py-[3px] pl-[3px] pr-2 t-meta text-paper backdrop-blur-md" style={{ background: "rgb(28 27 26 / 0.28)" }}>
+                  <Face face={p.face} size={18} />
+                  With {p.name}
                 </span>
               </button>
             </li>
-          ))}
-        </ul>
-
-        <h2 className="mt-8 px-1 t-title text-ink">In the residency</h2>
-        <ul className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-[28px] bg-paper" style={card}>
-          {people.map((p) => {
-            const l = last(p.id);
-            return (
-              <li key={p.id}>
-                <button type="button" onClick={() => thread(p.id)} className="press flex w-full items-center gap-3 px-4 py-3 text-left">
-                  <Face face={p.face} size={44} />
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2">
-                      <span className="t-nav text-ink">{p.name}</span>
-                      {p.pattern && <span className="rounded-full bg-fill px-2 py-[2px] t-meta text-ink-2">Same pattern</span>}
-                    </span>
-                    <span className="block truncate t-label text-ink-3">{l ?? p.work}</span>
-                  </span>
-                  <I.Chevron size={18} className="shrink-0 text-ink-4" />
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-    </div>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

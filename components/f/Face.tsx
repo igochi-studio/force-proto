@@ -5,8 +5,12 @@
 
 import { ART_SRC, THEMES, type Entry } from "@/data/mira";
 import type { Face as FaceT } from "@/data/social";
+import Glass from "./Glass";
 
+// From 28pt up a face is a glass bubble with the painting inside; below that it's too small
+// for the glass to read, so it stays a flat crop.
 export default function Face({ face, size = 40, className = "", label }: { face: FaceT; size?: number; className?: string; label?: string }) {
+  if (size >= 28) return <Glass size={size} art={face.art} x={face.x} y={face.y} img={face.img} zoom={380} className={className} label={label} />;
   return (
     <span
       className={`block shrink-0 rounded-full bg-cover ${className}`}

@@ -14,6 +14,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { ART_SRC, ART_TONE } from "@/data/mira";
 import { INCOMING, MIRA_FACE, PEOPLE, personById, questById, type Person } from "@/data/social";
 import { f, useF, type DmMsg } from "@/lib/f/store";
+import Glass from "./Glass";
 import Face from "./Face";
 import Goo, { string, type Blob } from "./Goo";
 import Nav from "./Nav";
@@ -412,9 +413,9 @@ function Between({ p }: { p: Person }) {
 
 function ForceFace({ size = 28 }: { size?: number }) {
   return (
-    <span className="grid shrink-0 place-items-center rounded-full bg-fill text-ink" style={{ width: size, height: size }} aria-hidden>
-      <Logo size={size * 0.55} />
-    </span>
+    <Glass size={size} art="dusk" x={40} y={40} zoom={300}>
+      <Logo size={size * 0.5} />
+    </Glass>
   );
 }
 

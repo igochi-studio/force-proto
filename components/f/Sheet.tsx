@@ -294,7 +294,7 @@ function Contour({ clip, active, onMoment }: { clip: Clip; active: number | null
 
 // A next move: swipe right to keep it, left to let it go. The card says what will happen as
 // you pull it.
-function MoveRow({ text }: { text: string }) {
+export function MoveRow({ text }: { text: string }) {
   const state = useF((s) => s.moves.find((m) => m.text === text));
   const x = useMotionValue(0);
   const keepA = useTransform(x, [0, 72], [0, 1]);
@@ -337,7 +337,7 @@ function MoveRow({ text }: { text: string }) {
   );
 }
 
-function Voice({ clip, line }: { clip: Clip; line: string }) {
+export function Voice({ clip, line }: { clip: Clip; line: string }) {
   const p = usePlayer(clip);
   const [active, setActive] = useState<number | null>(null);
   const moment = (k: number) => {

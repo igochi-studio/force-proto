@@ -5,6 +5,7 @@
 // start you over; ?reset=1 does.
 
 import { create } from "zustand";
+import type { Clip } from "@/data/mira";
 import { foundFor, pointsFrom, MOVES, type Found, type LinkKind, type Point } from "@/data/residency";
 
 export type Fit = "spot" | "mostly" | "no";
@@ -21,15 +22,18 @@ interface R {
   removed: string[]; // found items that weren't you
   moves: Record<string, "kept" | "dropped">;
   fit: Fit | null;
+  clips: Clip[]; // your recorded answers, for this visit only (the audio doesn't survive a refresh)
+  agreed: string[]; // points you said were you
+  tab: "conversations" | "people"; // which half of home is showing
 }
 
 const KEY = "force.residency";
-const FRESH: R = { done: false, name: "", links: {}, extra: [], onairos: "off", answers: [], points: [], found: [], removed: [], moves: {}, fit: null };
+const FRESH: R = { done: false, name: "", links: {}, extra: [], onairos: "off", answers: [], points: [], found: [], removed: [], moves: {}, fit: null, clips: [], agreed: [], tab: "conversations" };
 
 const load = (): R => {
   try {
     const s = typeof window !== "undefined" && localStorage.getItem(KEY);
-    return s ? { ...FRESH, ...JSON.parse(s), onairos: JSON.parse(s).onairos === "on" ? "on" : "off" } : FRESH;
+    return s ? { ...FRESH, ...JSON.parse(s), clips: [], onairos: JSON.parse(s).onairos === "on" ? "on" : "off" } : FRESH;
   } catch {
     return FRESH;
   }
@@ -41,7 +45,7 @@ const get = useR.getState;
 
 useR.subscribe((s) => {
   try {
-    localStorage.setItem(KEY, JSON.stringify(s));
+    localStorage.setItem(KEY, JSON.stringify({ ...s, clips: [] }));
   } catch {}
 });
 
@@ -68,9 +72,12 @@ export const r = {
     setTimeout(() => set({ onairos: "on" }), 1400);
   },
   // Three answers in: read them, with the links, into a first persona.
-  read(answers: string[]) {
+  read(answers: string[], clips: Clip[] = []) {
     const s = get();
-    set({ answers, points: pointsFrom(answers), found: foundFor(s.name, s.links), removed: [], moves: {}, fit: null });
+    set({ answers, clips, points: pointsFrom(answers), found: foundFor(s.name, s.links), removed: [], moves: {}, fit: null, agreed: [] });
+  },
+  agree(id: string) {
+    set((s) => ({ agreed: s.agreed.includes(id) ? s.agreed : [...s.agreed, id] }));
   },
   editPoint(id: string, text: string) {
     set((s) => ({ points: s.points.map((p) => (p.id === id ? { ...p, text } : p)) }));
@@ -95,8 +102,11 @@ export const r = {
   setFit(fit: Fit) {
     set({ fit });
   },
-  finish() {
-    set({ done: true });
+  finish(tab: R["tab"] = "conversations") {
+    set({ done: true, tab });
+  },
+  setTab(tab: R["tab"]) {
+    set({ tab });
   },
 };
 

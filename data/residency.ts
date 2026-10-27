@@ -20,13 +20,26 @@ export const SAMPLE_ANSWERS = [
 ];
 
 export type LinkKind = "linkedin" | "x" | "instagram" | "github" | "site";
-export const LINKS: { kind: LinkKind; name: string; mark: string; placeholder: string }[] = [
-  { kind: "linkedin", name: "LinkedIn", mark: "in", placeholder: "linkedin.com/in/you" },
-  { kind: "x", name: "X", mark: "X", placeholder: "@handle" },
-  { kind: "instagram", name: "Instagram", mark: "IG", placeholder: "@handle" },
-  { kind: "github", name: "GitHub", mark: "GH", placeholder: "github.com/you" },
-  { kind: "site", name: "Website or Substack", mark: "www", placeholder: "yoursite.com" },
+// Each link is a glass bubble with its own crop of a painting inside.
+export const LINKS: { kind: LinkKind; name: string; art: Art; x: number; y: number }[] = [
+  { kind: "linkedin", name: "LinkedIn", art: "water", x: 30, y: 60 },
+  { kind: "x", name: "X", art: "dusk", x: 50, y: 30 },
+  { kind: "instagram", name: "Instagram", art: "hills", x: 72, y: 22 },
+  { kind: "github", name: "GitHub", art: "park", x: 45, y: 35 },
+  { kind: "site", name: "Website or Substack", art: "meadow", x: 55, y: 30 },
 ];
+export const ONAIROS_ART = { art: "hills" as Art, x: 25, y: 70 };
+
+// A pasted link, shown as the handle it points to: no https, no www, no trailing slash.
+export function pretty(kind: LinkKind | "extra", raw: string) {
+  const s = raw.trim().replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/[/?#].*$/, (m) => (kind === "site" || kind === "extra" ? "" : m)).replace(/\/+$/, "");
+  const after = (re: RegExp) => s.replace(re, "").split(/[/?#]/)[0];
+  if (kind === "linkedin") return after(/^[a-z.]*linkedin\.com\/(in\/)?/i);
+  if (kind === "x") return `@${after(/^(x|twitter)\.com\//i).replace(/^@/, "")}`;
+  if (kind === "instagram") return `@${after(/^instagram\.com\//i).replace(/^@/, "")}`;
+  if (kind === "github") return after(/^github\.com\//i);
+  return s;
+}
 
 // What each link tells Force, once it's read.
 const FROM_LINK: Record<LinkKind, string> = {
@@ -54,12 +67,12 @@ export function foundFor(name: string, links: Partial<Record<LinkKind, string>>)
 
 // Onairos reads the apps you connect it to and hands back a personality read on the Big Five.
 // Force shows it in words, never as numbers.
-export const TRAITS: { name: string; read: string }[] = [
-  { name: "Openness", read: "High. You go looking for new ways in." },
-  { name: "Conscientiousness", read: "In bursts. Deep focus, then a reset." },
-  { name: "Extraversion", read: "Middle. Energised one-to-one, drained by rooms." },
-  { name: "Agreeableness", read: "High. You lead with the other person's side." },
-  { name: "Emotional range", read: "Steady, with a short fuse for wasted time." },
+export const TRAITS: { name: string; level: string; line: string }[] = [
+  { name: "Openness", level: "High", line: "You go looking for new ways in." },
+  { name: "Conscientiousness", level: "In bursts", line: "Deep focus, then a reset." },
+  { name: "Extraversion", level: "Middle", line: "One-to-one lifts you; rooms drain you." },
+  { name: "Agreeableness", level: "High", line: "You lead with the other person's side." },
+  { name: "Emotional range", level: "Steady", line: "Short fuse only for wasted time." },
 ];
 
 export interface Point {
@@ -103,16 +116,22 @@ export function pointsFrom(answers: string[]): Point[] {
   return out;
 }
 
+// What the patterns add up to, in one line. Mock until the agent writes it.
+export const HEADLINE = "A builder who learns by listening, and came here for the people.";
+
 export const MOVES = ["Ask Meera how she ran her first twenty farmer interviews", "Block one morning this week for the decision you've been putting off"];
 
 // The residency. Faces are painting crops until the real photos come in.
 export interface Resident extends Person {
   work: string; // what they're working on, in a line
   pattern?: string; // the pattern you share, when Force found one
+  quest?: string; // the side quest Force suggests for you two, as a title
+  socials: LinkKind[]; // where else they are
 }
 
-const r = (p: Omit<Resident, "energy" | "age" | "where" | "km" | "story" | "differs" | "words" | "shares"> & { art: Art }): Resident => ({
+const r = (p: Omit<Resident, "energy" | "age" | "where" | "km" | "story" | "differs" | "words" | "shares" | "socials"> & { art: Art; energy?: number; socials?: LinkKind[] }): Resident => ({
   energy: p.pattern ? 0.8 : 0.4,
+  socials: ["linkedin", "instagram"],
   age: 0,
   where: "In the residency",
   km: 0,
@@ -131,6 +150,9 @@ export const RESIDENTS: Resident[] = [
     face: { art: "meadow", x: 30, y: 25 },
     work: "Field research on how farming families borrow money",
     pattern: "You both learn by talking to people.",
+    quest: "A morning of farmer calls, together",
+    energy: 0.92,
+    socials: ["linkedin", "x", "site"],
     together: "You've both spent this month on the phone with farmers. Side quest: run one morning of calls together on Thursday, swap what you hear over lunch?",
     quests: [{ name: "Farmer credit research", art: "meadow" }, { name: "Learning Marathi properly", art: "park" }],
     reply: "Hi! Force says you're doing farmer calls too. I have a list of questions that took me months to get right, happy to share.",
@@ -142,6 +164,9 @@ export const RESIDENTS: Resident[] = [
     face: { art: "water", x: 70, y: 40 },
     work: "Cheap water sensors for village tanks",
     pattern: "You both build for someone specific.",
+    quest: "Saturday at Kabir's test tank",
+    energy: 0.84,
+    socials: ["linkedin", "github", "instagram"],
     together: "You're both building for villages you've actually visited. Side quest: a Saturday trip to the tank Kabir's testing at, an hour out of town?",
     quests: [{ name: "Water sensors", art: "water" }, { name: "Soldering on Sundays", art: "hills" }],
     reply: "Hey, I'm heading to the test site Saturday morning. There's a seat in the car if you want to see it.",
@@ -153,6 +178,9 @@ export const RESIDENTS: Resident[] = [
     face: { art: "dusk", x: 20, y: 70 },
     work: "A book about the markets of Pune",
     pattern: "You both came here for people.",
+    quest: "Mandai market at 6 a.m.",
+    energy: 0.76,
+    socials: ["instagram", "site"],
     together: "She's writing about markets, you're pricing what's sold in them. Side quest: walk Mandai market together early one morning?",
     quests: [{ name: "Writing a book", art: "dusk" }, { name: "Early morning walks", art: "meadow" }],
     reply: "Mandai at 6 is the best hour. I'm going Friday, come?",
