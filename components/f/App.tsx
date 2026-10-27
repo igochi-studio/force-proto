@@ -8,7 +8,7 @@
 
 import { useEffect, useRef } from "react";
 import { AnimatePresence, LayoutGroup, animate, motion, useMotionValue } from "motion/react";
-import { f, useF, type Screen } from "@/lib/f/store";
+import { f, tapped, useF, type Screen } from "@/lib/f/store";
 import Companion from "./Companion";
 import EntryView from "./EntryView";
 import Memory from "./Memory";
@@ -24,7 +24,8 @@ import { useR } from "@/lib/f/residency";
 import { SPRING, haptic } from "./ui";
 
 const keyOf = (s: Screen) => ("id" in s ? `${s.name}-${s.id}` : s.name);
-// Which pill the page grows out of.
+// Which side a page belongs to: memory pages close with a sideways swipe. Where a page grows
+// from is the spot you tapped (store.from); the corner of its pill is only the fallback.
 const surfaceOf = (s: Screen) => (["energy", "dm", "dive", "profile", "force", "persona"].includes(s.name) ? "energy-surface" : "memory-surface");
 
 function Page({ s }: { s: Screen }) {
@@ -52,6 +53,7 @@ function Page({ s }: { s: Screen }) {
 
 function Panel() {
   const stack = useF((s) => s.stack);
+  const from = useF((s) => s.from);
   const top = stack[stack.length - 1];
   // Memory sits to the left of the chat: swipe it back to the left and it follows your finger
   // off the screen. Every other page goes back the iOS way, from the left edge.
@@ -114,7 +116,7 @@ function Panel() {
           key="paper"
           ref={box}
           className="absolute inset-0 z-20 overflow-hidden bg-canvas"
-          style={{ transformOrigin: surfaceOf(stack[0]) === "energy-surface" ? "100% 0%" : "0% 0%", borderRadius: 36 }}
+          style={{ transformOrigin: from ? `${from.x}px ${from.y}px` : surfaceOf(stack[0]) === "energy-surface" ? "100% 0%" : "0% 0%", borderRadius: 36 }}
           initial={{ scale: 0.18, opacity: 0 }}
           animate={{ scale: 1, opacity: 1, borderRadius: 0 }}
           exit={{ scale: 0.18, opacity: 0, borderRadius: 36, transition: { type: "spring", duration: 0.38, bounce: 0 } }}
@@ -175,11 +177,22 @@ export default function App({ residency = false }: { residency?: boolean }) {
       else if (st.stack.length) f.pop();
     };
     window.addEventListener("keydown", on);
-    return () => window.removeEventListener("keydown", on);
+    // Remember where each touch lands, in the app's own coordinates, so a page can grow from it.
+    const touch = (e: PointerEvent) => {
+      const r = document.querySelector("[data-app]")?.getBoundingClientRect();
+      if (!r) return;
+      tapped.x = e.clientX - r.left;
+      tapped.y = e.clientY - r.top;
+    };
+    document.addEventListener("pointerdown", touch, true);
+    return () => {
+      window.removeEventListener("keydown", on);
+      document.removeEventListener("pointerdown", touch, true);
+    };
   }, []);
   return (
     <LayoutGroup>
-      <motion.div className="absolute inset-0" animate={{ scale: open ? 0.96 : 1, opacity: open ? 0 : 1 }} transition={SPRING.move} aria-hidden={open || sheet || (residency && !rDone)} inert={open || sheet || (residency && !rDone)}>
+      <motion.div data-app className="absolute inset-0" animate={{ scale: open ? 0.96 : 1, opacity: open ? 0 : 1 }} transition={SPRING.move} aria-hidden={open || sheet || (residency && !rDone)} inert={open || sheet || (residency && !rDone)}>
         {residency ? <Residents /> : <Companion />}
       </motion.div>
       <div inert={sheet} aria-hidden={sheet || undefined}>

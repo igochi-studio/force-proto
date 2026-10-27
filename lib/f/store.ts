@@ -73,6 +73,7 @@ interface State {
   settings: Settings;
   chat: Msg[];
   stack: Screen[];
+  from: { x: number; y: number } | null; // where the open page grew from: the spot you tapped
   entries: Entry[];
   quests: Quest[];
   trail: TrailItem[]; // pattern maps you've made
@@ -107,6 +108,7 @@ export const useF = create<State>(() => ({
   settings: { mic: true, bell: true, pin: true, calendar: true, photos: false, notes: false },
   chat: [],
   stack: [],
+  from: null,
   entries: ENTRIES,
   quests: QUESTS,
   trail: TRAIL.filter((t) => t.kind === "pattern"),
@@ -128,6 +130,9 @@ export const greeting = () => {
   const h = hour();
   return h < 5 ? "Still up" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 };
+
+// The last place you touched, inside the app; App keeps it up to date.
+export const tapped = { x: -1, y: -1 };
 
 let typingTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -282,8 +287,10 @@ export const f = {
     }));
   },
 
+  // Opening the first page remembers the spot you tapped, so the page grows out of it and
+  // goes back into it, whatever you tapped and wherever it sits.
   push(s: Screen) {
-    set((st) => ({ stack: [...st.stack, s] }));
+    set((st) => ({ stack: [...st.stack, s], from: st.stack.length ? st.from : tapped.x < 0 ? null : { ...tapped } }));
   },
   pop() {
     set((st) => ({ stack: st.stack.slice(0, -1) }));
