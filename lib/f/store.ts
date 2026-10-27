@@ -33,7 +33,9 @@ export type Screen =
   | { name: "energy"; focus?: string }
   | { name: "dive"; id: string; from?: { x: number; y: number; w: number; h: number } } // into a painting, from its cover
   | { name: "dm"; id: string }
-  | { name: "profile" };
+  | { name: "profile" }
+  | { name: "force" } // the residency: talking to Force, opened from the conversations
+  | { name: "persona" }; // the residency: who Force thinks you are
 
 export interface Sheet {
   key: number;
@@ -168,6 +170,19 @@ export const f = {
     const before = new Set(get().entries.map((e) => e.id));
     clips.forEach((clip) => keep({ id: uid(), from: "me", kind: "audio", clip }));
     return get().entries.filter((e) => !before.has(e.id)).map((e) => e.id);
+  },
+  keepTexts(texts: string[]) {
+    texts.forEach((text) => keep({ id: uid(), from: "me", kind: "text", text }));
+  },
+  // The residency: every thread opens with Force saying why, and a side quest to vote on.
+  openThread(id: string) {
+    const p = personById(id);
+    if (!p || get().dms[id]?.length) return;
+    const why = (p as { pattern?: string }).pattern;
+    set((s) => ({
+      reached: { ...s.reached, [id]: "yes" },
+      dms: { ...s.dms, [id]: [{ id: uid("d"), from: "force", text: why ? `${why} I'm here too.` : `You and ${p.name}, with me in the middle.` }, { id: uid("d"), from: "force", text: p.together, poll: { options: ["We're in", "Something else"], votes: {} } }] },
+    }));
   },
   setSetting(k: keyof Settings, v: boolean) {
     set((s) => ({ settings: { ...s.settings, [k]: v } }));
@@ -323,6 +338,10 @@ export const f = {
     const t = text.trim();
     if (!t) return;
     set((s) => ({ dms: { ...s.dms, [id]: [...(s.dms[id] ?? []), { id: uid("d"), from: "me", text: t }] } }));
+    // A thread that opened with Force alone: they answer your first message.
+    const p = personById(id);
+    if (p && !get().dms[id].some((m) => m.from === "them"))
+      setTimeout(() => set((s) => (s.dms[id].some((m) => m.from === "them") ? s : { dms: { ...s.dms, [id]: [...s.dms[id], { id: uid("d"), from: "them", text: p.reply }] } })), 1500);
   },
   // Voting in one of Force's polls. They vote a moment later.
   vote(id: string, msgId: string, option: string) {

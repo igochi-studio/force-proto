@@ -5,7 +5,7 @@
 import type { Kind } from "@/data/mira";
 import {
   ArrowUp, AudioLines, Bold, Camera, Check, ChevronLeft, ChevronRight, Clipboard, Globe, Image as ImageIcon, Link, List, ListFilter,
-  Maximize2, Mic, Music, Pause, Play, Plus, Redo2, Square, Undo2, Video, X, Italic, Underline, Strikethrough, LocateFixed, CalendarDays, Minimize2, List as Bullets, ListOrdered, Highlighter, KeyboardOff, Spline, Waypoints, Orbit, PenLine, Search, NotebookPen, Images, Bell, Phone, ArrowRight, MapPin, type LucideIcon,
+  Maximize2, Mic, Music, Pause, Play, Plus, Redo2, Square, Undo2, Video, X, Italic, Underline, Strikethrough, LocateFixed, CalendarDays, Minimize2, List as Bullets, ListOrdered, Highlighter, KeyboardOff, Spline, Waypoints, Orbit, PenLine, Search, NotebookPen, Images, Bell, Phone, ArrowRight, MapPin, Pencil, type LucideIcon,
 } from "lucide-react";
 
 // ── Motion ──
@@ -81,6 +81,7 @@ export const I = {
   Phone: L(Phone),
   Arrow: L(ArrowRight),
   Pin: L(MapPin),
+  Edit: L(Pencil),
 };
 
 // Force's mark, from the invite.

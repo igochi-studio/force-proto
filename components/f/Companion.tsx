@@ -15,7 +15,7 @@ import Composer from "./Composer";
 import Face from "./Face";
 import { BlurTop } from "./Nav";
 import VoiceMode from "./VoiceMode";
-import { I, Logo, SPRING, haptic } from "./ui";
+import { I, Logo, Paint, SPRING, haptic } from "./ui";
 
 // The two places you can go. Memory on the left, the Energy map on the right.
 function TopPill({ to, label, icon, flip }: { to: "memory" | "energy"; label: string; icon: React.ReactNode; flip?: boolean }) {
@@ -114,7 +114,8 @@ function Message({ m, first, lastOfGroup, gap }: { m: Msg; first: boolean; lastO
   );
 }
 
-export default function Companion() {
+// bare: opened as a page (the residency), so a back button and Memory instead of the home pills.
+export default function Companion({ bare = false }: { bare?: boolean }) {
   const chat = useF((s) => s.chat);
   const list = useRef<HTMLUListElement>(null);
   const root = useRef<HTMLDivElement>(null);
@@ -154,7 +155,7 @@ export default function Companion() {
         if (m.kind === "text") f.open({ label: "One message", entryIds: [], text: m.text });
         else if (m.kind === "audio") f.open({ label: m.clip.name, entryIds: [], text: m.clip.transcript, clips: [m.clip] });
         else f.open(f.chatScope());
-      } else setVoice({ x: e.clientX - (box?.left ?? 0), y: e.clientY - (box?.top ?? 0), el: root.current });
+      } else if (!bare) setVoice({ x: e.clientX - (box?.left ?? 0), y: e.clientY - (box?.top ?? 0), el: root.current });
     }, 420);
     g.current = s;
   };
@@ -179,10 +180,21 @@ export default function Companion() {
   };
 
   return (
-    <div ref={root} className="absolute inset-0 flex flex-col overflow-hidden" style={{ paddingTop: "var(--sat)", paddingBottom: "var(--sab)" }}>
+    <div ref={root} className="absolute inset-0 flex flex-col overflow-hidden bg-canvas" style={{ paddingTop: "var(--sat)", paddingBottom: "var(--sab)" }}>
       <div data-no-shot>
         <BlurTop height={76} />
       </div>
+      {bare ? (
+        <header data-no-shot className="absolute inset-x-0 z-[2] flex h-[60px] items-center justify-between px-4 pt-2" style={{ top: "var(--sat)" }}>
+          <button type="button" aria-label="Back" onClick={() => f.pop()} className="press pill hit h-11 w-11 justify-center p-0">
+            <I.Back size={22} />
+          </button>
+          <h1 className="absolute left-1/2 -translate-x-1/2 t-nav text-ink">Force</h1>
+          <button type="button" onClick={() => (haptic(), f.push({ name: "memory" }))} className="press pill h-11 gap-2 pl-3 pr-4 t-label font-medium">
+            <Paint name="memory" h={18} /> Memory
+          </button>
+        </header>
+      ) : (
       <header data-no-shot className="absolute inset-x-0 z-[2] flex h-[60px] items-center justify-between px-4 pt-2" style={{ top: "var(--sat)" }}>
         <TopPill to="memory" label="Memory" icon={<Face face={MIRA_FACE} size={30} />} />
         <span className="flex items-center gap-2">
@@ -192,6 +204,7 @@ export default function Companion() {
           </button>
         </span>
       </header>
+      )}
 
       <ul
         ref={list}

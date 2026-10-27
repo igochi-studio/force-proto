@@ -11,7 +11,7 @@ import { I, SPRING, haptic } from "./ui";
 
 const BARS = 28;
 
-function Live({ rec, since }: { rec: Recording; since: number }) {
+export function Live({ rec, since, hint = "Let go to send" }: { rec: Recording; since: number; hint?: string }) {
   const [lv, setLv] = useState<number[]>(() => Array(BARS).fill(0.08));
   const [secs, setSecs] = useState(0);
   useEffect(() => {
@@ -42,7 +42,7 @@ function Live({ rec, since }: { rec: Recording; since: number }) {
       <span className="t-num shrink-0 text-ink-2">
         {Math.floor(secs / 60)}:{String(Math.floor(secs % 60)).padStart(2, "0")}
       </span>
-      <span className="hidden shrink-0 t-meta text-ink-3 min-[380px]:block">Let go to send</span>
+      <span className="hidden shrink-0 t-meta text-ink-3 min-[380px]:block">{hint}</span>
     </div>
   );
 }
@@ -115,8 +115,10 @@ export default function Composer() {
     }
   };
 
-  // Hold the mic to talk, let go to send. A tap just says how.
+  // Tap the mic to record and tap stop to send, or hold it and let go. Tapping works the same
+  // on every phone; holding is the shortcut.
   const hold = useRef<{ timer?: ReturnType<typeof setTimeout>; holding: boolean; released: boolean }>({ holding: false, released: false });
+  const [tapped, setTapped] = useState(false);
   const live = useRef<{ r: Recording } | null>(null);
   useEffect(() => {
     live.current = rec ? { r: rec.r } : null;
@@ -138,7 +140,10 @@ export default function Composer() {
   const holdEnd = () => {
     const h = hold.current;
     clearTimeout(h.timer);
-    if (!h.holding) return f.toast("Hold to talk");
+    if (!h.holding) {
+      setTapped(true);
+      return startRec();
+    }
     h.holding = false;
     if (live.current) stopRec();
     else h.released = true;
@@ -241,7 +246,7 @@ export default function Composer() {
               >
                 <I.Close size={16} />
               </button>
-              <Live rec={rec.r} since={rec.since} />
+              <Live rec={rec.r} since={rec.since} hint={tapped ? "Tap ■ to send" : "Let go to send"} />
             </motion.div>
           ) : (
             <motion.textarea
@@ -282,11 +287,14 @@ export default function Composer() {
               <motion.button
                 key="mic"
                 type="button"
-                aria-label="Hold to talk"
+                aria-label="Record a voice note"
                 disabled={saving}
-                onPointerDown={holdStart}
+                onPointerDown={(e) => {
+                  setTapped(false);
+                  holdStart(e);
+                }}
                 onPointerUp={holdEnd}
-                onPointerCancel={holdEnd}
+                onPointerCancel={() => clearTimeout(hold.current.timer)}
                 onContextMenu={(e) => e.preventDefault()}
                 className="press hit grid h-9 w-9 touch-none select-none place-items-center text-ink"
                 initial={{ opacity: 0 }}

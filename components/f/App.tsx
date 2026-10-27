@@ -17,11 +17,15 @@ import Onboarding from "./Onboarding";
 import Profile from "./Profile";
 import { QuestPage } from "./Quests";
 import SheetHost from "./Sheet";
+import ResidencyOnboarding from "../r/Onboarding";
+import Persona from "../r/Persona";
+import Residents from "../r/Residents";
+import { useR } from "@/lib/f/residency";
 import { SPRING, haptic } from "./ui";
 
 const keyOf = (s: Screen) => ("id" in s ? `${s.name}-${s.id}` : s.name);
 // Which pill the page grows out of.
-const surfaceOf = (s: Screen) => (["energy", "dm", "dive", "profile"].includes(s.name) ? "energy-surface" : "memory-surface");
+const surfaceOf = (s: Screen) => (["energy", "dm", "dive", "profile", "force", "persona"].includes(s.name) ? "energy-surface" : "memory-surface");
 
 function Page({ s }: { s: Screen }) {
   switch (s.name) {
@@ -39,6 +43,10 @@ function Page({ s }: { s: Screen }) {
       return <DmPage id={s.id} />;
     case "profile":
       return <Profile />;
+    case "force":
+      return <Companion bare />;
+    case "persona":
+      return <Persona />;
   }
 }
 
@@ -113,7 +121,7 @@ function Panel() {
           transition={SPRING.surface}
         >
           {stack.length > 1 && <div className="absolute inset-0 bg-canvas opacity-60" aria-hidden />}
-          <motion.div key={keyOf(top)} className="absolute inset-0 bg-canvas" style={{ paddingTop: top.name === "dive" ? 0 : "var(--sat)", paddingBottom: top.name === "dive" ? 0 : "var(--sab)", x }} onPointerDown={(e) => start(e, false)} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
+          <motion.div key={keyOf(top)} className="absolute inset-0 bg-canvas" style={{ paddingTop: top.name === "dive" || top.name === "force" ? 0 : "var(--sat)", paddingBottom: top.name === "dive" || top.name === "force" ? 0 : "var(--sab)", x }} onPointerDown={(e) => start(e, false)} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
             <Page s={top} />
           </motion.div>
           <div className="absolute inset-y-0 left-0 z-30 w-5" style={{ touchAction: "pan-y" }} onPointerDown={(e) => start(e, true)} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} aria-hidden />
@@ -151,10 +159,13 @@ function Toast() {
   );
 }
 
-export default function App() {
+// residency: the build for the residency. Home is the conversations, not the chat, and the
+// way in is its own (connectors, three questions, the persona, people like you).
+export default function App({ residency = false }: { residency?: boolean }) {
   const open = useF((s) => s.stack.length > 0);
   const sheet = useF((s) => !!s.sheet);
   const onboarded = useF((s) => s.onboarded);
+  const rDone = useR((s) => s.done);
   // Escape closes the top-most layer: a sheet, then the paper.
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
@@ -169,14 +180,14 @@ export default function App() {
   return (
     <LayoutGroup>
       <motion.div className="absolute inset-0" animate={{ scale: open ? 0.96 : 1, opacity: open ? 0 : 1 }} transition={SPRING.move} aria-hidden={open || sheet} inert={open || sheet}>
-        <Companion />
+        {residency ? <Residents /> : <Companion />}
       </motion.div>
       <div inert={sheet} aria-hidden={sheet || undefined}>
         <Panel />
       </div>
       <SheetHost />
       <Toast />
-      <AnimatePresence>{!onboarded && <Onboarding key="onboarding" />}</AnimatePresence>
+      <AnimatePresence>{residency ? !rDone && <ResidencyOnboarding key="residency" /> : !onboarded && <Onboarding key="onboarding" />}</AnimatePresence>
     </LayoutGroup>
   );
 }

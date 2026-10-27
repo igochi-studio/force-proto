@@ -12,7 +12,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ART_SRC, ART_TONE } from "@/data/mira";
-import { INCOMING, MIRA_FACE, PEOPLE, questById, type Person } from "@/data/social";
+import { INCOMING, MIRA_FACE, PEOPLE, personById, questById, type Person } from "@/data/social";
 import { f, useF, type DmMsg } from "@/lib/f/store";
 import Face from "./Face";
 import Goo, { string, type Blob } from "./Goo";
@@ -399,7 +399,7 @@ function Between({ p }: { p: Person }) {
       <span className="relative flex h-12 flex-1 items-center">
         <span className="h-px w-full" style={{ background: "linear-gradient(to right, var(--grey-300), var(--ink), var(--grey-300))" }} />
         <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-paper px-3 py-1 t-label font-medium text-ink" style={{ boxShadow: "var(--lift-1)" }}>
-          {p.km >= 100 ? `${Math.round(p.km / 10) * 10} km` : `${p.km} km`}
+          {p.km === 0 ? "Residency" : p.km >= 100 ? `${Math.round(p.km / 10) * 10} km` : `${p.km} km`}
         </span>
       </span>
       <span className="flex flex-col items-center gap-1">
@@ -450,7 +450,7 @@ function Poll({ m, id, p }: { m: DmMsg; id: string; p: Person }) {
 }
 
 export function DmPage({ id }: { id: string }) {
-  const p = PEOPLE.find((x) => x.id === id);
+  const p = personById(id);
   const msgs = useF((s) => s.dms[id]) ?? NONE;
   const [text, setText] = useState("");
   const list = useRef<HTMLUListElement>(null);

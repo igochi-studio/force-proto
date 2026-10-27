@@ -9,6 +9,7 @@
 // out, and they get asked; once they accept, the rest is disclosed and you can talk.
 
 import type { Art } from "./mira";
+import { RESIDENTS } from "./residency";
 
 export interface Quest {
   id: string;
@@ -216,5 +217,5 @@ export const PEOPLE: Person[] = [
 export const INCOMING = { id: "sam", quest: "q-work" };
 
 export const questById = (id: string) => QUESTS.find((q) => q.id === id);
-export const personById = (id: string) => PEOPLE.find((p) => p.id === id);
+export const personById = (id: string): Person | undefined => PEOPLE.find((p) => p.id === id) ?? RESIDENTS.find((p) => p.id === id);
 export const questOfTheme = (theme: string) => QUESTS.find((q) => q.theme === theme);
