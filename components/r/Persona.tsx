@@ -9,8 +9,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, useTransform } from "motion/react";
-import type { Art } from "@/data/mira";
-import { HEADLINE, LINKS, MOVES, ONAIROS_ART, TRAITS, type Point } from "@/data/residency";
+import { HEADLINE, LINKS, MOVES, TRAITS, residentById, worldFor, type NodeKind, type Point } from "@/data/residency";
 import { voiceFor } from "@/lib/f/analyse";
 import { f } from "@/lib/f/store";
 import { r, useR, type Fit } from "@/lib/f/residency";
@@ -18,25 +17,67 @@ import Glass from "../f/Glass";
 import Nav from "../f/Nav";
 import { MoveRow, Voice } from "../f/Sheet";
 import { MARKS } from "../f/brands";
-import PaintedYou, { type Source } from "./PaintedYou";
+import PatternWorld from "./PatternWorld";
 import { LinkList, NameField, OnairosCard } from "./Links";
 import { I, SPRING, haptic } from "../f/ui";
 
 
-// ── You, painted ──
-// Everything Force read from becomes a stroke of its painting, and the strokes become you.
-export function usePaintSources(): Source[] {
-  const { links, onairos } = useR();
-  return [
-    ...LINKS.filter((l) => links[l.kind]?.trim()).map((l) => ({ key: l.kind, label: l.kind === "site" ? "Website" : l.name, art: l.art, x: l.x, y: l.y })),
-    ...(onairos === "on" ? [{ key: "onairos", label: "Onairos", ...ONAIROS_ART }] : []),
-    { key: "voice", label: "Your voice", art: "hills" as Art, x: 74, y: 18 },
-    { key: "search", label: "What's public", art: "meadow" as Art, x: 40, y: 60 },
-  ];
+// ── Your pattern map ──
+// The world of you: you, what you want to change, the themes around it, and the people here
+// who share them. Tap a node to see what it is and where Force read it.
+export function useWorld() {
+  const answers = useR((s) => s.answers);
+  const name = useR((s) => s.name);
+  return useMemo(() => worldFor(answers, name), [answers, name]);
 }
 
-function YouMap({ name }: { name: string }) {
-  return <PaintedYou sources={usePaintSources()} name={name} />;
+const KIND: Record<NodeKind, string> = { you: "You", intent: "What you want to change", theme: "Theme", person: "In the residency" };
+
+function YouMap({ onPerson }: { onPerson: (id: string) => void }) {
+  const world = useWorld();
+  const [focus, setFocus] = useState<string | null>(null);
+  const n = world.nodes.find((x) => x.id === focus) ?? null;
+  const links = n ? world.edges.flatMap(([a, b]) => (a === n.id ? [b] : b === n.id ? [a] : [])).map((id) => world.nodes.find((x) => x.id === id)!) : [];
+  const res = n?.person ? residentById(n.person) : null;
+  return (
+    <div>
+      <div className="relative h-[340px] overflow-hidden rounded-[28px] bg-paper" style={{ boxShadow: "var(--lift-1)" }}>
+        <PatternWorld nodes={world.nodes} edges={world.edges} focus={focus} onTap={setFocus} />
+        {!n && <span className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-fill px-3 py-[6px] t-meta text-ink-3">Drag to turn · tap a node</span>}
+      </div>
+      <AnimatePresence initial={false} mode="popLayout">
+        {n && (
+          <motion.div key={n.id} className="mt-2 rounded-[24px] bg-paper p-4" style={{ boxShadow: "var(--lift-1)" }} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.12 } }} transition={SPRING.ui}>
+            <div className="flex items-start gap-3">
+              <span className="min-w-0 flex-1">
+                <span className="block t-meta text-ink-3">{KIND[n.kind]}</span>
+                <span className="mt-[2px] block t-body font-semibold text-ink">{res ? `${res.name} · ${res.work}` : n.label}</span>
+                {(res?.pattern ?? n.line) && <span className="mt-1 block t-label text-ink-2">{res?.pattern ?? n.line}</span>}
+                {n.from && <span className="mt-1 block t-label text-ink-3">{n.from}</span>}
+              </span>
+              <button type="button" aria-label="Close" onClick={() => setFocus(null)} className="press hit grid h-8 w-8 shrink-0 place-items-center rounded-full bg-fill text-ink">
+                <I.Close size={14} />
+              </button>
+            </div>
+            {links.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-[6px]">
+                {links.map((l) => (
+                  <button key={l.id} type="button" onClick={() => (haptic(), setFocus(l.id))} className="press hit h-8 rounded-full bg-fill px-3 t-label text-ink">
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {res && (
+              <button type="button" onClick={() => onPerson(res.id)} className="press pill-ink mt-3 h-11 w-full justify-center t-body font-medium">
+                Message {res.name}
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 // ── Swipe to say ──
@@ -220,7 +261,12 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
     <div className="relative flex h-full flex-col">
       <Nav title={first || "You"} onBack={onBack} />
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-[64px]">
-        <YouMap name={first} />
+        <YouMap
+          onPerson={(id) => {
+            onContinue?.();
+            setTimeout(() => (f.openThread(id), f.push({ name: "dm", id })), onContinue ? 400 : 0);
+          }}
+        />
 
         <p className="mt-6 px-1 t-title text-ink">{summary}</p>
         <p className="mt-2 px-1 t-body text-ink-3">
@@ -289,6 +335,17 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
           <NameField />
           <LinkList className="mt-2" />
           <OnairosCard className="mt-2" />
+          <button
+            type="button"
+            onClick={() => {
+              haptic("done");
+              r.read(useR.getState().answers, useR.getState().clips);
+              f.toast("Force read you again.");
+            }}
+            className="press mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-fill t-body font-medium text-ink"
+          >
+            <I.Redo size={16} /> Read me again
+          </button>
         </section>
 
         <section className="mt-8">

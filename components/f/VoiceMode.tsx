@@ -28,6 +28,7 @@ export default function VoiceMode({ origin, shotOf, onClose, limit, onClip, orb 
   const recRef = useRef<Recording | null>(null);
   const done = useRef(false);
   const [sample, setSample] = useState(false); // no microphone: say so quietly, in place
+  const [plain, setPlain] = useState(false); // this browser can't bend the screen: rings instead
 
   // Start listening the moment you hold.
   useEffect(() => {
@@ -94,7 +95,11 @@ export default function VoiceMode({ origin, shotOf, onClose, limit, onClip, orb 
         if (!live) return;
         const start = performance.now();
         w = water(c, shot, origin, start);
-        if (!w) return;
+        if (!w) {
+          setPlain(true);
+          setSettled(true);
+          return;
+        }
         setReady(true);
         // The touch, and a softer second ring behind it
         w.ring(1);
@@ -119,8 +124,9 @@ export default function VoiceMode({ origin, shotOf, onClose, limit, onClip, orb 
         raf = requestAnimationFrame(frame);
       })
       .catch(() => {
-        // No photograph: nothing to bend, so just listen.
-        setReady(true);
+        // No photograph (or no WebGL): nothing to bend, so plain rings from the same point.
+        setPlain(true);
+        setSettled(true);
       });
     return () => {
       live = false;
@@ -174,6 +180,13 @@ export default function VoiceMode({ origin, shotOf, onClose, limit, onClip, orb 
       >
         <I.Close size={18} />
       </button>
+      {plain && (
+        <span className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+          {[0, 1, 2].map((i) => (
+            <span key={i} className="vm-ring absolute rounded-full" style={{ left: origin.x, top: origin.y, animationDelay: `${i * 1.1}s` }} />
+          ))}
+        </span>
+      )}
       {orb && (
         <>
           <span className="pointer-events-none absolute" style={{ left: origin.x, top: origin.y, translate: "-50% -50%" }}>

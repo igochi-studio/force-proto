@@ -229,25 +229,25 @@ function Card({ p, x, y }: { p: Resident; x: number; y: number }) {
   );
 }
 
-// ── Side quests, as painted covers ──
-
+// ── Side quests: after the residency ──
+// A preview of where Force is going: what you and someone here could go and do together.
+// Not part of the residency build, so the covers are shown, not opened.
 function SideQuests() {
   const quests = RESIDENTS.filter((p) => p.quest);
   const odd = quests.length % 2 === 1;
   return (
     <section className="mt-10">
-      <h2 className="mb-3 px-1 t-body text-ink-3">Side quests Force suggests</h2>
-      <ul className="grid grid-cols-2 gap-3">
+      <div className="mb-3 flex items-baseline justify-between px-1">
+        <h2 className="t-body text-ink-3">Side quests</h2>
+        <span className="rounded-full bg-fill px-2 py-[2px] t-meta text-ink-2">Coming after the residency</span>
+      </div>
+      <p className="mb-3 px-1 t-label text-ink-3">Where Force is heading: something real to do together, picked from the patterns you share.</p>
+      <ul className="grid grid-cols-2 gap-3" aria-label="Side quests, coming after the residency">
         {quests.map((p, i) => {
           const wide = odd && i === quests.length - 1;
           return (
             <li key={p.id} className={wide ? "col-span-2" : ""}>
-              <button
-                type="button"
-                onClick={() => thread(p.id)}
-                className={`press relative block w-full overflow-hidden rounded-[24px] bg-cover text-left ${wide ? "aspect-[2/1]" : "aspect-[4/5]"}`}
-                style={{ backgroundImage: `url(${ART_SRC[p.face.art]})`, backgroundPosition: `${p.face.x}% ${p.face.y}%`, boxShadow: "var(--lift-1)" }}
-              >
+              <div className={`relative w-full overflow-hidden rounded-[24px] bg-cover ${wide ? "aspect-[2/1]" : "aspect-[4/5]"}`} style={{ backgroundImage: `url(${ART_SRC[p.face.art]})`, backgroundPosition: `${p.face.x}% ${p.face.y}%`, boxShadow: "var(--lift-1)" }}>
                 <span className="absolute inset-0 grid place-items-center p-3">
                   <span className="max-w-full rounded-[16px] px-3 py-[6px] text-center t-label font-medium text-paper backdrop-blur-md" style={{ background: "rgb(28 27 26 / 0.28)" }}>
                     {p.quest}
@@ -257,7 +257,7 @@ function SideQuests() {
                   <Face face={p.face} size={18} />
                   With {p.name}
                 </span>
-              </button>
+              </div>
             </li>
           );
         })}

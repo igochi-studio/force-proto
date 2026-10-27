@@ -528,3 +528,30 @@ input:-webkit-autofill:focus {
   caret-color: var(--ink);
   transition: background-color 9999s;
 }
+
+/* Voice mode where the screen can't be bent: soft rings of light going out from the point */
+.vm-ring {
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  box-shadow:
+    0 0 0 1.5px rgba(28, 27, 26, 0.08),
+    inset 0 0 12px rgba(255, 255, 255, 0.9);
+  animation: vm-ring 3.3s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+  opacity: 0;
+}
+@keyframes vm-ring {
+  0% {
+    scale: 1;
+    opacity: 0.9;
+  }
+  100% {
+    scale: 22;
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vm-ring {
+    animation: none;
+  }
+}

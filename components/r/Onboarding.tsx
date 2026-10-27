@@ -18,9 +18,9 @@ import VoiceMode from "../f/VoiceMode";
 import { AudioBubble, Bubble, Typing } from "../f/Bubbles";
 import Glass from "../f/Glass";
 import { I, Logo, Paint, haptic } from "../f/ui";
-import Persona, { usePaintSources } from "./Persona";
+import Persona, { useWorld } from "./Persona";
 import { LinkList, NameField, OnairosCard } from "./Links";
-import PaintedYou from "./PaintedYou";
+import PatternWorld from "./PatternWorld";
 
 type Step = "splash" | "connect" | "talk";
 
@@ -259,11 +259,10 @@ function Talk({ onNext }: { onNext: () => void }) {
   );
 }
 
-// The pattern map, in the conversation. It arrives at once and paints itself while Force
-// analyses: one stroke for each thing it's reading. Only when it's done does it become
-// something you can open.
+// The pattern map, in the conversation, the way the world used to arrive. It grows out from
+// you while Force analyses; only when it's done does it become something you can open.
 function MapCard({ onOpen, onRead }: { onOpen: () => void; onRead: () => void }) {
-  const points = useR((s) => s.points);
+  const world = useWorld();
   const [ready, setReady] = useState(false);
   return (
     <button type="button" disabled={!ready} onClick={onOpen} className="press block w-full overflow-hidden rounded-[24px] bg-paper text-left disabled:active:scale-100" style={{ boxShadow: "var(--lift-1)" }}>
@@ -275,20 +274,23 @@ function MapCard({ onOpen, onRead }: { onOpen: () => void; onRead: () => void })
           <I.Expand size={14} />
         </span>
       </span>
-      <PaintedYou
-        sources={usePaintSources()}
-        height={220}
-        bare
-        onDone={() => {
-          setReady(true);
-          onRead();
-        }}
-      />
+      <span className="block h-[240px]">
+        <PatternWorld
+          nodes={world.nodes}
+          edges={world.edges}
+          focus={null}
+          interactive={false}
+          onGrown={() => {
+            setReady(true);
+            onRead();
+          }}
+        />
+      </span>
       <span className="block min-h-[68px] px-4 pb-4">
         {ready ? (
           <>
             <span className="block t-body font-semibold text-ink">{HEADLINE}</span>
-            <span className="mt-1 block t-label text-ink-3">{points.length} patterns about you · tap to open</span>
+            <span className="mt-1 block t-label text-ink-3">{world.nodes.filter((n) => n.kind === "intent").length} things you want to change, {world.nodes.filter((n) => n.kind === "person").length} people here who share them · tap to open</span>
           </>
         ) : (
           <span className="block pt-2 t-label text-ink-3" aria-live="polite">

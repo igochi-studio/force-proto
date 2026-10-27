@@ -31,6 +31,21 @@ npm run build
 
 Deploy (needs access to the Vercel project): `vercel deploy --prod --yes --name force-proto`.
 
+## Residency build (`/residency`, this branch)
+
+The flow being tested with the residency. Live: https://force-proto.vercel.app/residency. Every visit starts from the beginning; `?keep=1` keeps where you were.
+
+1. **Mark** paints itself, then moves on by itself (`components/r/Onboarding.tsx`).
+2. **Connect:** name, LinkedIn / X / Instagram / GitHub / website (pasted URLs read back as handles), extra links, Onairos (`components/r/Links.tsx`). No phone number, no permission screens: the browser asks for the mic when it's needed.
+3. **Three questions** as a chat. Tap the glass orb and talk (the screen ripples from it; tap anywhere to finish), or type. No hold gesture, so it behaves the same on iOS and Android.
+4. **Pattern map** arrives in the chat and grows while Force analyses (`components/r/PatternWorld.tsx`). Node kinds: you → intents & problems → themes & approaches → residents who share a theme. Tap it to open your page.
+5. **Your page** (`components/r/Persona.tsx`): the map (drag to turn, tap a node for what it is and where it was read), the patterns (swipe right = that's me, left = not me, tap = rewrite; an instruction card shows on first visit), voice, Onairos traits, your links (editable; changing one re-reads what was found online; "Read me again" re-runs it), found online (swipe away namesakes), next moves, "How close is this?".
+6. **Home** (`components/r/Residents.tsx`): your face (your page) → **People** (energy map of the residency) → **Conversations** (Force first, then every resident; threads open with Force saying why you match). Side quests are shown as a preview, "coming after the residency".
+
+What's mock and where the real data goes: everything in `data/residency.ts` (questions, residents, `pointsFrom`, `worldFor`, `foundFor`, `TRAITS`, `HEADLINE`, `MOVES`). Replace those with the agent / scraper / Onairos output; the components only read from the store in `lib/f/residency.ts`. Onairos is simulated: the real one is `npm i onairos`, `<OnairosButton requestData={{ personality: true }} onComplete={…} />`.
+
+Browsers: recording uses `MediaRecorder` (mp4 on Safari, webm on Chrome/Android) and falls back to a labelled sample without a mic; transcripts use the browser's speech recognition where it exists (not Firefox). The ripple needs WebGL and a DOM snapshot; where either fails it falls back to plain rings from the orb.
+
 ## What's in it
 
 ```

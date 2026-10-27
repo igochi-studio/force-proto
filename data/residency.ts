@@ -119,6 +119,47 @@ export function pointsFrom(answers: string[]): Point[] {
 // What the patterns add up to, in one line. Mock until the agent writes it.
 export const HEADLINE = "A builder who learns by listening, and came here for the people.";
 
+// Your pattern map as nodes, in the founder's three kinds:
+//   you: the person
+//   intent: what you want to change, accomplish or understand (the problems you care about)
+//   theme: the concepts, fields and methods around it, which is where you meet other people
+// Residents who share a theme hang off it, so the map already shows who you'd meet. Mock
+// until the agent's output lands; every intent quotes the answer it came from.
+export type NodeKind = "you" | "intent" | "theme" | "person";
+export interface WNode {
+  id: string;
+  kind: NodeKind;
+  label: string;
+  line?: string; // what it means, in a sentence
+  from?: string; // where Force read it
+  art: Art;
+  person?: string; // a resident's id
+}
+export function worldFor(answers: string[], name: string): { nodes: WNode[]; edges: [string, string][] } {
+  const a = answers.map((x, i) => x.trim() || SAMPLE_ANSWERS[i]);
+  const nodes: WNode[] = [
+    { id: "you", kind: "you", label: name.trim().split(/\s+/)[0] || "You", art: "hills" },
+    { id: "i1", kind: "intent", label: "Fair prices for small farmers", line: "What you're building toward.", from: `Answer 1: “${clause(a[0])}”`, art: "meadow" },
+    { id: "i2", kind: "intent", label: "Learning from the people you build for", line: "How you like to work it out.", from: `Answer 2: “${clause(a[1])}”`, art: "park" },
+    { id: "i3", kind: "intent", label: "Leaving with people, not just output", line: "What would make this residency a win.", from: `Answer 3: “${clause(a[2])}”`, art: "dusk" },
+    { id: "t1", kind: "theme", label: "Agricultural markets", from: "Your answers and LinkedIn", art: "meadow" },
+    { id: "t2", kind: "theme", label: "Pricing", from: "Your answers and your essays", art: "hills" },
+    { id: "t3", kind: "theme", label: "WhatsApp-first products", from: "GitHub", art: "water" },
+    { id: "t4", kind: "theme", label: "Field research", from: "Your answers", art: "park" },
+    { id: "t5", kind: "theme", label: "Rural tech", from: "A panel you spoke on", art: "water" },
+    { id: "t6", kind: "theme", label: "Community", from: "Your answers", art: "dusk" },
+    { id: "p-meera", kind: "person", label: "Meera", person: "meera", art: "meadow" },
+    { id: "p-kabir", kind: "person", label: "Kabir", person: "kabir", art: "water" },
+    { id: "p-ananya", kind: "person", label: "Ananya", person: "ananya", art: "dusk" },
+  ];
+  const edges: [string, string][] = [
+    ["you", "i1"], ["you", "i2"], ["you", "i3"],
+    ["i1", "t1"], ["i1", "t2"], ["i1", "t3"], ["i2", "t4"], ["i2", "t5"], ["i3", "t6"],
+    ["t4", "p-meera"], ["t5", "p-kabir"], ["t1", "p-ananya"], ["t6", "p-ananya"],
+  ];
+  return { nodes, edges };
+}
+
 export const MOVES = ["Ask Meera how she ran her first twenty farmer interviews", "Block one morning this week for the decision you've been putting off"];
 
 // The residency. Faces are painting crops until the real photos come in.

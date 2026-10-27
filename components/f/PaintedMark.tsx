@@ -173,11 +173,15 @@ export default function PaintedMark({ size = 240, onDone }: { size?: number; onD
       // shapes, sharp.
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, c.width, c.height);
-      ctx.save();
-      ctx.filter = `blur(${3 * dpr}px)`;
-      ctx.globalAlpha = 0.35;
-      ctx.drawImage(layer, 0, 0);
-      ctx.restore();
+      // The bloom needs canvas blur; older Safari doesn't have it, and a sharp copy would
+      // only double the strokes, so there it's simply left out.
+      if ("filter" in ctx) {
+        ctx.save();
+        ctx.filter = `blur(${3 * dpr}px)`;
+        ctx.globalAlpha = 0.35;
+        ctx.drawImage(layer, 0, 0);
+        ctx.restore();
+      }
       T(ctx);
       ctx.save();
       ctx.clip(all);
