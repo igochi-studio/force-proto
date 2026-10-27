@@ -50,15 +50,24 @@ useR.subscribe((s) => {
   } catch {}
 });
 
+// Once Force has read you, changing a link means reading what's online again. What you
+// already said wasn't you stays gone.
+const reread = () => {
+  const s = get();
+  if (s.answers.length) set({ found: foundFor(s.name, s.links) });
+};
+
 export const r = {
   reset() {
     set({ ...FRESH });
   },
   setName(name: string) {
     set({ name });
+    reread();
   },
   setLink(k: LinkKind, v: string) {
     set((s) => ({ links: { ...s.links, [k]: v } }));
+    reread();
   },
   setExtra(i: number, v: string) {
     set((s) => ({ extra: s.extra.map((x, j) => (j === i ? v : x)) }));

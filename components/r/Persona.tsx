@@ -19,6 +19,7 @@ import Nav from "../f/Nav";
 import { MoveRow, Voice } from "../f/Sheet";
 import { MARKS } from "../f/brands";
 import PaintedYou, { type Source } from "./PaintedYou";
+import { LinkList, NameField, OnairosCard } from "./Links";
 import { I, SPRING, haptic } from "../f/ui";
 
 
@@ -203,9 +204,10 @@ function H({ children, hint }: { children: React.ReactNode; hint?: string }) {
   );
 }
 
-// sheet: opened from the pattern map in the conversation (its own header and Done live in the
-// sheet). Otherwise it's the You page, with a back button.
-export default function Persona({ sheet }: { sheet?: boolean }) {
+// Your page: you, painted, then the patterns, then where Force looked (your links, editable,
+// and what it found), then the moves. The same page from the pattern map in the conversation
+// and from your face on home. onContinue: on the way in, it ends by taking you to the people.
+export default function Persona({ onBack, onContinue }: { onBack?: () => void; onContinue?: () => void }) {
   const { name, points, found, removed, fit, onairos, agreed, clips, links, tip } = useR();
   const [own, setOwn] = useState("");
   const shown = found.filter((x) => !removed.includes(x.id));
@@ -215,118 +217,132 @@ export default function Persona({ sheet }: { sheet?: boolean }) {
   const summary = points.length ? HEADLINE : "Force needs a little more of you first.";
 
   return (
-    <div className={sheet ? "px-4 pb-8 pt-2" : "no-scrollbar relative h-full overflow-y-auto px-4 pb-10 pt-[64px]"}>
-      {!sheet && <Nav title="You" />}
+    <div className="relative flex h-full flex-col">
+      <Nav title={first || "You"} onBack={onBack} />
+      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-[64px]">
+        <YouMap name={first} />
 
-      <YouMap name={first} />
+        <p className="mt-6 px-1 t-title text-ink">{summary}</p>
+        <p className="mt-2 px-1 t-body text-ink-3">
+          From your three answers{nLinks ? `, ${nLinks} ${nLinks === 1 ? "link" : "links"}` : ""}
+          {onairos === "on" ? ", Onairos" : ""} and what&apos;s public under your name.
+        </p>
 
-      <p className="mt-6 px-1 t-title text-ink">{summary}</p>
-      <p className="mt-2 px-1 t-body text-ink-3">
-        From your three answers{nLinks ? `, ${nLinks} ${nLinks === 1 ? "link" : "links"}` : ""}
-        {onairos === "on" ? ", Onairos" : ""} and what&apos;s public under your name.
-      </p>
-
-      <section className="mt-8">
-        <H>The patterns</H>
-        <Tip />
-        <div className="flex flex-col gap-2">
-          <AnimatePresence initial={false}>
-            {points.map((p, i) => (
-              <motion.div key={p.id} layout exit={{ opacity: 0, height: 0, transition: { duration: 0.25 } }} transition={SPRING.move}>
-                <PatternCard p={p} agreed={agreed.includes(p.id)} peek={!tip && i === 0} />
-              </motion.div>
-            ))}
-          </AnimatePresence>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              r.addPoint(own);
-              setOwn("");
-            }}
-            className="flex h-[52px] items-center gap-2 rounded-full bg-paper pl-5 pr-[6px]"
-            style={{ boxShadow: "var(--lift-1)" }}
-          >
-            <input value={own} onChange={(e) => setOwn(e.target.value)} placeholder="Something Force missed…" aria-label="Add something Force missed" enterKeyHint="done" className="min-w-0 flex-1 bg-transparent t-body text-ink outline-none placeholder:text-ink-3" />
-            {own.trim() && (
-              <button type="submit" aria-label="Add" onPointerDown={(e) => e.preventDefault()} className="press grid h-10 w-10 place-items-center rounded-full bg-ink text-paper">
-                <I.Up size={18} />
-              </button>
-            )}
-          </form>
-        </div>
-      </section>
-
-      {voices.length > 0 && (
         <section className="mt-8">
-          <H>In your voice</H>
+          <H>The patterns</H>
+          <Tip />
           <div className="flex flex-col gap-2">
-            {voices.map((v) => (
-              <Voice key={v.clip.id} clip={v.clip} line={v.line} />
-            ))}
+            <AnimatePresence initial={false}>
+              {points.map((p, i) => (
+                <motion.div key={p.id} layout exit={{ opacity: 0, height: 0, transition: { duration: 0.25 } }} transition={SPRING.move}>
+                  <PatternCard p={p} agreed={agreed.includes(p.id)} peek={!tip && i === 0} />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                r.addPoint(own);
+                setOwn("");
+              }}
+              className="flex h-[52px] items-center gap-2 rounded-full bg-paper pl-5 pr-[6px]"
+              style={{ boxShadow: "var(--lift-1)" }}
+            >
+              <input value={own} onChange={(e) => setOwn(e.target.value)} placeholder="Something Force missed…" aria-label="Add something Force missed" enterKeyHint="done" className="min-w-0 flex-1 bg-transparent t-body text-ink outline-none placeholder:text-ink-3" />
+              {own.trim() && (
+                <button type="submit" aria-label="Add" onPointerDown={(e) => e.preventDefault()} className="press grid h-10 w-10 place-items-center rounded-full bg-ink text-paper">
+                  <I.Up size={18} />
+                </button>
+              )}
+            </form>
           </div>
         </section>
-      )}
 
-      {onairos === "on" && (
+        {voices.length > 0 && (
+          <section className="mt-8">
+            <H>In your voice</H>
+            <div className="flex flex-col gap-2">
+              {voices.map((v) => (
+                <Voice key={v.clip.id} clip={v.clip} line={v.line} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {onairos === "on" && (
+          <section className="mt-8">
+            <H hint="Onairos, from the apps you connected.">How you show up</H>
+            <ul className="grid grid-cols-2 gap-2">
+              {TRAITS.map((t, i) => (
+                <li key={t.name} className={`rounded-[24px] bg-paper p-4 ${i === TRAITS.length - 1 ? "col-span-2" : ""}`} style={{ boxShadow: "var(--lift-1)" }}>
+                  <p className="t-meta text-ink-3">{t.name}</p>
+                  <p className="mt-1 t-body font-semibold text-ink">{t.level}</p>
+                  <p className="mt-1 t-label text-ink-2">{t.line}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         <section className="mt-8">
-          <H hint="Onairos, from the apps you connected.">How you show up</H>
-          <ul className="grid grid-cols-2 gap-2">
-            {TRAITS.map((t, i) => (
-              <li key={t.name} className={`rounded-[24px] bg-paper p-4 ${i === TRAITS.length - 1 ? "col-span-2" : ""}`} style={{ boxShadow: "var(--lift-1)" }}>
-                <p className="t-meta text-ink-3">{t.name}</p>
-                <p className="mt-1 t-body font-semibold text-ink">{t.level}</p>
-                <p className="mt-1 t-label text-ink-2">{t.line}</p>
-              </li>
+          <H hint="Change one and Force reads it again.">Your links</H>
+          <NameField />
+          <LinkList className="mt-2" />
+          <OnairosCard className="mt-2" />
+        </section>
+
+        <section className="mt-8">
+          <H hint="Someone else with your name? Swipe it away.">Found online</H>
+          <ul className="flex flex-col gap-2">
+            <AnimatePresence initial={false}>
+              {shown.map((x) => {
+                const l = LINKS.find((k) => k.kind === x.id);
+                const M = l ? MARKS[l.kind] : () => <I.Search size={16} />;
+                return (
+                  <motion.li key={x.id} layout exit={{ opacity: 0, height: 0, transition: { duration: 0.25 } }} transition={SPRING.move}>
+                    <Swipe left="Not me" onLeft={() => r.notMe(x.id)} className="flex items-center gap-3 rounded-[28px] bg-paper py-3 pl-3 pr-4" style={{ boxShadow: "var(--lift-1)" }}>
+                      <Glass size={40} art={l?.art ?? "water"} x={l?.x ?? 70} y={l?.y ?? 30} zoom={300}>
+                        <M size={16} />
+                      </Glass>
+                      <span className="min-w-0 flex-1">
+                        <span className="block t-body text-ink">{x.text}</span>
+                        <span className="block t-meta text-ink-3">{x.byName ? "Found by your name" : x.source}</span>
+                      </span>
+                    </Swipe>
+                  </motion.li>
+                );
+              })}
+            </AnimatePresence>
+          </ul>
+          {removed.length > 0 && (
+            <button type="button" onClick={() => r.undoNotMe()} className="press mt-1 flex h-11 items-center px-2 t-label text-ink-3">
+              {removed.length} not you · <span className="ml-1 font-medium text-ink-2">Undo</span>
+            </button>
+          )}
+        </section>
+
+        <section className="mt-8">
+          <H hint="Swipe right to keep one and Force will nudge you. Swipe left to let it go.">Next moves</H>
+          <ul className="flex flex-col gap-2">
+            {MOVES.map((m) => (
+              <MoveRow key={m} text={m} />
             ))}
           </ul>
         </section>
-      )}
 
-      <section className="mt-8">
-        <H hint="Someone else with your name? Swipe it away.">Found online</H>
-        <ul className="flex flex-col gap-2">
-          <AnimatePresence initial={false}>
-            {shown.map((x) => {
-              const l = LINKS.find((k) => k.kind === x.id);
-              const M = l ? MARKS[l.kind] : () => <I.Search size={16} />;
-              return (
-                <motion.li key={x.id} layout exit={{ opacity: 0, height: 0, transition: { duration: 0.25 } }} transition={SPRING.move}>
-                  <Swipe left="Not me" onLeft={() => r.notMe(x.id)} className="flex items-center gap-3 rounded-[28px] bg-paper py-3 pl-3 pr-4" style={{ boxShadow: "var(--lift-1)" }}>
-                    <Glass size={40} art={l?.art ?? "water"} x={l?.x ?? 70} y={l?.y ?? 30} zoom={300}>
-                      <M size={16} />
-                    </Glass>
-                    <span className="min-w-0 flex-1">
-                      <span className="block t-body text-ink">{x.text}</span>
-                      <span className="block t-meta text-ink-3">{x.byName ? "Found by your name" : x.source}</span>
-                    </span>
-                  </Swipe>
-                </motion.li>
-              );
-            })}
-          </AnimatePresence>
-        </ul>
-        {removed.length > 0 && (
-          <button type="button" onClick={() => r.undoNotMe()} className="press mt-1 flex h-11 items-center px-2 t-label text-ink-3">
-            {removed.length} not you · <span className="ml-1 font-medium text-ink-2">Undo</span>
+        <section className="mt-8">
+          <H>How close is this?</H>
+          <Fit />
+          {fit && fit !== "spot" && <p className="mt-3 px-1 t-label text-ink-3">Thank you. Swipe away what&apos;s off, or tap a pattern to say it your way. Force asks again after a few conversations.</p>}
+        </section>
+      </div>
+      {onContinue && (
+        <div className="shrink-0 px-4 pb-3 pt-2">
+          <button type="button" onClick={onContinue} className="press pill-ink h-[52px] w-full justify-center t-body font-medium">
+            Find people with this energy
           </button>
-        )}
-      </section>
-
-      <section className="mt-8">
-        <H hint="Swipe right to keep one and Force will nudge you. Swipe left to let it go.">Next moves</H>
-        <ul className="flex flex-col gap-2">
-          {MOVES.map((m) => (
-            <MoveRow key={m} text={m} />
-          ))}
-        </ul>
-      </section>
-
-      <section className="mt-8">
-        <H>How close is this?</H>
-        <Fit />
-        {fit && fit !== "spot" && <p className="mt-3 px-1 t-label text-ink-3">Thank you. Swipe away what&apos;s off, or tap a pattern to say it your way. Force asks again after a few conversations.</p>}
-      </section>
-
+        </div>
+      )}
     </div>
   );
 }
