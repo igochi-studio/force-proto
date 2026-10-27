@@ -9,12 +9,12 @@ import { r } from "@/lib/f/residency";
 
 const App = dynamic(() => import("@/components/f/App"), { ssr: false });
 
-// The residency build: you arrive as someone new, so memory starts empty.
-// ?reset=1 starts the way in again.
+// The residency build: you arrive as someone new, so memory starts empty. For the demo,
+// every visit starts at the beginning of the way in; ?keep=1 picks up where you left off.
 export default function Residency() {
   useEffect(() => {
     f.setDemo("new");
-    if (new URLSearchParams(window.location.search).get("reset") === "1") r.reset();
+    if (new URLSearchParams(window.location.search).get("keep") !== "1") r.reset();
     if (process.env.NODE_ENV !== "production") (window as unknown as { __f: typeof f }).__f = f;
   }, []);
 

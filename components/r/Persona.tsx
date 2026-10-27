@@ -7,7 +7,7 @@
 // way moves are: swipe right if it's you, left if it isn't, tap to rewrite. Then how close
 // it got, and the people with this energy.
 
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence, motion, useMotionValue, useTransform } from "motion/react";
 import type { Art } from "@/data/mira";
 import { HEADLINE, LINKS, MOVES, ONAIROS_ART, TRAITS, type Point } from "@/data/residency";
@@ -15,71 +15,25 @@ import { voiceFor } from "@/lib/f/analyse";
 import { f } from "@/lib/f/store";
 import { r, useR, type Fit } from "@/lib/f/residency";
 import Glass from "../f/Glass";
-import Goo, { string, type Blob } from "../f/Goo";
 import Nav from "../f/Nav";
 import { MoveRow, Voice } from "../f/Sheet";
-import { MARKS, OnairosMark } from "../f/brands";
+import { MARKS } from "../f/brands";
+import PaintedYou, { type Source } from "./PaintedYou";
 import { I, SPRING, haptic } from "../f/ui";
 import { Primary } from "./Onboarding";
 
-const ME: { art: Art; x: number; y: number } = { art: "park", x: 45, y: 30 };
 
-// ── Your map ──
-// You in the middle; what Force read from strung round you in beads of its painting.
+// ── You, painted ──
+// Everything Force read from becomes a stroke of its painting, and the strokes become you.
 function YouMap({ name }: { name: string }) {
   const { links, onairos } = useR();
-  const box = useRef<HTMLDivElement>(null);
-  const [w, setW] = useState(361);
-  const H = 260;
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setW(el.clientWidth));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  const around = useMemo(
-    () => [
-      ...LINKS.filter((l) => links[l.kind]?.trim()).map((l) => ({ key: l.kind, art: l.art, x: l.x, y: l.y, mark: MARKS[l.kind] })),
-      ...(onairos === "on" ? [{ key: "onairos", ...ONAIROS_ART, mark: OnairosMark }] : []),
-      { key: "answers", art: "hills" as Art, x: 74, y: 18, mark: ({ size }: { size?: number }) => <I.Wave size={size} /> },
-    ],
-    [links, onairos],
-  );
-  const { spots, blobs } = useMemo(() => {
-    const k = H / w;
-    const me: Blob = { x: 0.5, y: 0.5, r: 0, art: ME.art };
-    const blobs: Blob[] = [];
-    const n = around.length;
-    const spots = around.map((s, i) => {
-      const a = -Math.PI / 2 + (i / n) * Math.PI * 2 + 0.4;
-      const d = 0.34 + (i % 2) * 0.06;
-      const x = 0.5 + Math.cos(a) * d * k * 1.25;
-      const y = 0.5 + Math.sin(a) * d;
-      blobs.push(...string(me, { x, y, r: 0, art: s.art }, s.art, 12, 0.012));
-      return { ...s, px: x, py: y };
-    });
-    return { spots, blobs };
-  }, [around, w]);
-  return (
-    <div ref={box} className="relative overflow-hidden rounded-[28px] bg-paper" style={{ height: H, boxShadow: "var(--lift-1)" }}>
-      <Goo blobs={blobs} w={w} h={H} className="absolute inset-0" />
-      {spots.map((s, i) => {
-        const M = s.mark;
-        return (
-          <motion.span key={s.key} className="absolute" style={{ left: `${s.px * 100}%`, top: `${s.py * 100}%`, x: "-50%", y: "-50%" }} animate={{ y: ["-50%", "-58%", "-50%"] }} transition={{ duration: 5 + i * 0.7, repeat: Infinity, ease: "easeInOut" }}>
-            <Glass size={44} art={s.art} x={s.x} y={s.y} zoom={280}>
-              <M size={17} />
-            </Glass>
-          </motion.span>
-        );
-      })}
-      <span className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center">
-        <Glass size={92} {...ME} zoom={220} />
-        {name && <span className="mt-2 rounded-full bg-paper px-3 py-[3px] t-label font-medium text-ink" style={{ boxShadow: "var(--lift-1)" }}>{name}</span>}
-      </span>
-    </div>
-  );
+  const sources: Source[] = [
+    ...LINKS.filter((l) => links[l.kind]?.trim()).map((l) => ({ key: l.kind, label: l.kind === "site" ? "Website" : l.name, art: l.art, x: l.x, y: l.y })),
+    ...(onairos === "on" ? [{ key: "onairos", label: "Onairos", ...ONAIROS_ART }] : []),
+    { key: "voice", label: "Your voice", art: "hills" as Art, x: 74, y: 18 },
+    { key: "search", label: "What's public", art: "meadow" as Art, x: 40, y: 60 },
+  ];
+  return <PaintedYou sources={sources} name={name} />;
 }
 
 // ── Swipe to say ──
