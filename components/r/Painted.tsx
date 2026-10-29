@@ -2,16 +2,21 @@
 
 // Colour for the analysis, from the paintings: every kind of read has its painting and its
 // hue (tint behind, deep for words on the tint), so what Force tells you looks like Force,
-// not a form. The five parts keep the same painting as their node on your map.
+// not a form. The parts keep the same painting as their node on your map.
 
 import { ART_SRC, ART_TONE, type Art } from "@/data/mira";
-import type { Field, Noticed } from "@/contract/residency";
+import { FIELDS, type Field, type Noticed } from "@/contract/residency";
 import Glass from "../f/Glass";
 import { Logo } from "../f/ui";
+import { useDragScroll } from "@/lib/r/dragScroll";
 
 // Matched to the chart series (intent sky, problem amber, open question rose).
 export const FIELD_ART: Record<Field, Art> = { intent: "water", problem: "hills", approach: "meadow", current_frontier: "park", contribution: "dusk" };
 export const tone = (art: Art) => ART_TONE[art];
+
+// The parts a resident sees. Contribution (what you'd offer, what you'd look for) stays in the
+// contract, but the residency is over, so there's no one left to offer it to.
+export const PARTS = FIELDS.filter((k) => k !== "contribution");
 
 // Where to crop each painting so neighbouring cards don't show the same patch.
 const CROPS: [Art, number, number][] = [
@@ -34,13 +39,14 @@ export function ForceMark({ size = 28 }: { size?: number }) {
 // "What Force noticed": a deck you swipe, one painted card per read, each saying where it
 // came from in its own colour.
 export function InsightDeck({ items, foot }: { items: Noticed[]; foot?: React.ReactNode }) {
+  const row = useDragScroll<HTMLUListElement>();
   return (
     <div>
-      <ul className="scroll-row no-scrollbar -mx-4 snap-x snap-mandatory px-4 pb-2" aria-label="What Force noticed">
+      <ul ref={row} className="scroll-row no-scrollbar -mx-4 snap-x snap-mandatory px-4 pb-2" aria-label="What Force noticed">
         {items.map((n, i) => {
           const [art, x, y] = CROPS[i % CROPS.length];
           return (
-            <li key={i} className="flex w-[80%] max-w-[312px] shrink-0 snap-center flex-col overflow-hidden rounded-[28px] bg-paper" style={{ boxShadow: "var(--lift-1)" }}>
+            <li key={i} className="flex w-[80%] max-w-[312px] shrink-0 cursor-grab snap-center flex-col overflow-hidden rounded-[28px] bg-paper" style={{ boxShadow: "var(--lift-1)" }}>
               <div className="relative h-[104px] shrink-0 bg-cover" style={{ backgroundImage: `url(${ART_SRC[art]})`, backgroundPosition: `${x}% ${y}%`, backgroundSize: "220%" }}>
                 <span className="absolute right-4 top-4 rounded-full px-2 py-[2px] t-num text-[12px] text-ink backdrop-blur-md" style={{ background: "rgb(255 255 255 / 0.6)" }}>
                   {String(i + 1).padStart(2, "0")} / {String(items.length).padStart(2, "0")}

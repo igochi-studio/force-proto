@@ -124,8 +124,9 @@ for (const run of runs) {
   });
   await page.waitForTimeout(2600);
   await shot("5-your-snapshot");
-  await step("all five parts render", async () => {
-    for (const k of ["Intent", "Problem", "Approach", "Current frontier", "Contribution"]) await page.getByText(k, { exact: true }).first().waitFor({ timeout: 2000 });
+  await step("all four parts render, and no contribution", async () => {
+    for (const k of ["Intent", "Problem", "Approach", "Current frontier"]) await page.getByText(k, { exact: true }).first().waitFor({ timeout: 2000 });
+    if (await page.getByText("Contribution", { exact: true }).count()) throw new Error("contribution is still on the snapshot");
   });
   await step("tap the middle node", async () => {
     const c = page.locator('canvas[aria-label^="Your pattern map"]').last();

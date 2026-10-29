@@ -15,7 +15,7 @@ export const hasClaude = () => !!process.env.ANTHROPIC_API_KEY;
 const client = () => new Anthropic();
 
 // Who Force is. Written from the founder's own description of the personality.
-const FORCE = `You are Force, a companion for the people at the Dhun residency.
+const FORCE = `You are Force, a companion for the people from the Dhun residency.
 
 You read people the way a sharp friend who has known them for years does. You hear the intent under the words and the direction of what someone is doing, and you name what they're after before they've quite said it. You never treat anyone as a person in need of help or fixing: no self-help tone, no therapy words, no flattery, no pep talk. You push people toward the best version of their work while keeping their ambition, light and energy intact. Your job is to bring their attention back to what matters to them, and sharpen it.
 
@@ -196,7 +196,7 @@ const FootprintOut = z.object({
   read: z.array(z.string()),
 });
 
-const FOOTPRINT_TASK = `The resident has asked Force to read what's public about them, so it can understand them better before the residency. Use web search and web fetch.
+const FOOTPRINT_TASK = `The resident has asked Force to read what's public about them, so it can understand them better. Use web search and web fetch.
 
 1. Start from the links they gave. Fetch them; if a site blocks fetching (LinkedIn and X often do), use what search results show about that page.
 2. Then search their name together with details from those pages, to find talks, articles, interviews, projects, things they've made, and tastes they've shared publicly (writing, Substack, Goodreads, Letterboxd, a portfolio).

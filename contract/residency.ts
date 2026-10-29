@@ -280,8 +280,8 @@ export function nextStepFor(frontier: string | null, intent: string | null, o: O
   if (nudge && /^[A-Z][a-z]+\b/.test(nudge))
     return { text: nudge.replace(/\.$/, ""), why_it_may_help: `It speaks to what you said you're stuck on: “${condense(frontier!, 12)}”`, status: "suggested", source: "onairos_nudge" };
   if (frontier)
-    return { text: "Write your open question as one sentence and ask one resident it this week", why_it_may_help: `You named this as your biggest blocker: “${condense(frontier, 12)}”`, status: "suggested", source: "force" };
-  return { text: "Tell one resident what you want to have made progress on by the end", why_it_may_help: `Saying it out loud early is how people here find you: “${condense(intent!, 12)}”`, status: "suggested", source: "force" };
+    return { text: "Write your open question as one sentence and ask someone from the residency", why_it_may_help: `You named this as your biggest blocker: “${condense(frontier, 12)}”`, status: "suggested", source: "force" };
+  return { text: "Tell someone from the residency what you want to have made progress on a month from now", why_it_may_help: `Saying it out loud early is how people here find you: “${condense(intent!, 12)}”`, status: "suggested", source: "force" };
 }
 
 // "I'm prototyping with five teams, and I'm still figuring out whether they'd pay" →

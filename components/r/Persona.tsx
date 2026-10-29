@@ -1,9 +1,9 @@
 "use client";
 
-// "Here's what Force understands so far": your Intent Snapshot, the five parts Force drafted
+// "Here's what Force understands so far": your Intent Snapshot, the four parts Force drafted
 // from your answers, each with where it came from, each yours to correct. Your map first
 // (you, what you want to change, the approaches around it, the people you're connected with),
-// then the five parts, one useful next step, what Onairos added, and two separate choices:
+// then the four parts, one useful next step, what Onairos added, and two separate choices:
 // approve it, and whether the residency can see it. Nothing that ranks you, nothing that grades your personality.
 //
 // Correcting works the way next moves do: swipe right if it's right, left if it isn't (it
@@ -12,14 +12,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, useTransform } from "motion/react";
 import { Settings2 } from "lucide-react";
-import { CONNECTION_LABEL, FIELDS, QUESTIONS, FIELD_LABEL, FIELD_MEANING, OFFER_TAGS, SEEK_TAGS, isEmpty, type Field, type Snapshot } from "@/contract/residency";
+import { CONNECTION_LABEL, QUESTIONS, FIELD_LABEL, FIELD_MEANING, isEmpty, type Field, type Snapshot } from "@/contract/residency";
 import { residentById, youWorld, type NodeKind } from "@/data/residency";
 import { f } from "@/lib/f/store";
 import { r, useR } from "@/lib/f/residency";
 import { otherIn, useCohort } from "@/lib/r/cohort";
 import Nav, { BlurBottom } from "../f/Nav";
 import MapFrame from "./MapFrame";
-import { Band, FIELD_ART, ForceMark, InsightDeck, cropOf } from "./Painted";
+import { Band, FIELD_ART, ForceMark, InsightDeck, PARTS, cropOf } from "./Painted";
 import Traits from "./Traits";
 import Glass from "../f/Glass";
 import { LinkList, LookupCard, NameField, OnairosCard } from "./Links";
@@ -152,7 +152,7 @@ function Swipe({ onRight, onLeft, right, left, children, className = "", style, 
   );
 }
 
-// ── The five parts ──
+// ── The four parts ──
 
 const SOURCE: Record<string, string> = {
   "user_answer:q1": "From your answer to question 1",
@@ -160,7 +160,6 @@ const SOURCE: Record<string, string> = {
   "user_answer:q3": "From your answer to question 3",
   user_answer: "Read from the words in your answers",
   user_edit: "You said this",
-  contribution_fields: "From what you picked",
 };
 
 function sourceOf(s: Snapshot, k: Field, onairos: boolean) {
@@ -173,48 +172,12 @@ function sourceOf(s: Snapshot, k: Field, onairos: boolean) {
 
 function valueOf(s: Snapshot, k: Field) {
   if (k === "approach") return s.approach.join(" · ");
-  if (k === "contribution") return [s.contribution.can_offer.length ? `Can offer: ${s.contribution.can_offer.join(", ")}` : "", s.contribution.seeking.length ? `Looking for: ${s.contribution.seeking.join(", ")}` : ""].filter(Boolean).join("\n");
-  return s[k] ?? "";
-}
-
-function Tags({ tags, on, onFlip }: { tags: readonly string[]; on: string[]; onFlip: (t: string) => void }) {
-  return (
-    <div className="flex flex-wrap gap-[6px]">
-      {[...tags, ...on.filter((x) => !tags.includes(x))].map((t) => (
-        <button key={t} type="button" aria-pressed={on.includes(t)} onClick={() => (haptic(), onFlip(t))} className={`press h-9 rounded-full px-3 t-label transition-colors duration-200 ${on.includes(t) ? "bg-ink text-paper" : "bg-fill text-ink"}`}>
-          {t}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function ContributionEdit({ s, onDone }: { s: Snapshot; onDone: () => void }) {
-  const [offer, setOffer] = useState(s.contribution.can_offer);
-  const [seek, setSeek] = useState(s.contribution.seeking);
-  const flip = (set: React.Dispatch<React.SetStateAction<string[]>>) => (t: string) => set((x) => (x.includes(t) ? x.filter((y) => y !== t) : [...x, t]));
-  return (
-    <div className="rounded-[28px] bg-paper p-4" style={{ boxShadow: "var(--lift-2)" }}>
-      <p className="mb-2 t-label text-ink-3">I can help others with…</p>
-      <Tags tags={OFFER_TAGS} on={offer} onFlip={flip(setOffer)} />
-      <p className="mb-2 mt-4 t-label text-ink-3">I would value help with…</p>
-      <Tags tags={SEEK_TAGS} on={seek} onFlip={flip(setSeek)} />
-      <div className="mt-3 flex items-center justify-end gap-1">
-        <button type="button" onClick={onDone} className="press h-9 px-3 t-label text-ink-3">
-          Cancel
-        </button>
-        <button type="button" onClick={() => (r.editField("contribution", { can_offer: offer, seeking: seek }), onDone())} className="press h-9 rounded-full bg-ink px-4 t-label font-medium text-paper">
-          Save
-        </button>
-      </div>
-    </div>
-  );
+  return (s[k] as string | null) ?? "";
 }
 
 function FieldCard({ s, k, peek, onairos }: { s: Snapshot; k: Field; peek?: boolean; onairos: boolean }) {
   const [edit, setEdit] = useState<string | null>(null);
   const empty = isEmpty(s, k);
-  if (edit !== null && k === "contribution") return <ContributionEdit s={s} onDone={() => setEdit(null)} />;
   if (edit !== null)
     return (
       <form
@@ -239,7 +202,7 @@ function FieldCard({ s, k, peek, onairos }: { s: Snapshot; k: Field; peek?: bool
         </div>
       </form>
     );
-  const open = () => setEdit(k === "approach" ? s.approach.join(", ") : k === "contribution" ? "" : (s[k] ?? ""));
+  const open = () => setEdit(k === "approach" ? s.approach.join(", ") : ((s[k] as string | null) ?? ""));
   const said = (s.provenance[k] ?? []).includes("user_edit");
   const art = FIELD_ART[k];
   const [, cx, cy] = cropOf(Object.keys(FIELD_ART).indexOf(k));
@@ -546,7 +509,7 @@ function H({ children, hint }: { children: React.ReactNode; hint?: string }) {
 // Your page: the same from the snapshot in the conversation and from your face on home.
 // onContinue: on the way in, approving takes you on to the residency.
 export default function Persona({ onBack, onContinue }: { onBack?: () => void; onContinue?: () => void }) {
-  const { name, snapshot: s, persona, onairos, tip, contribution, sharePersona } = useR();
+  const { name, snapshot: s, persona, onairos, tip, sharePersona } = useR();
   const { mine } = useCohort();
   const first = name.trim().split(/\s+/)[0];
   const [settings, setSettings] = useState(false);
@@ -566,8 +529,8 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
 
   const approved = s.status === "approved";
   const canApprove = !!(s.intent || s.problem);
-  const from = ["your three answers", contribution.can_offer.length + contribution.seeking.length ? "what you offer and seek" : "", onairos === "on" ? "Onairos" : ""].filter(Boolean);
-  const status = approved ? (s.shared ? "Approved and shared. You're in the cohort graph." : "Approved. Only you can see it.") : "Not approved yet. Only you can see this. Any change needs approving again.";
+  const from = ["your three answers", onairos === "on" ? "Onairos" : ""].filter(Boolean);
+  const status = s.shared ? "Approved and shared. You're in the cohort graph." : "Approved. Only you can see it.";
 
   return (
     <div className="relative flex h-full flex-col">
@@ -621,10 +584,10 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
         <Found />
 
         <section className="mt-8">
-          <H hint="Force wrote these from what you said. Your words win.">The five parts</H>
+          <H hint="Force wrote these from what you said. Your words win.">The four parts</H>
           <Tip />
           <div className="flex flex-col gap-2">
-            {FIELDS.map((k, i) => (
+            {PARTS.map((k, i) => (
               <FieldCard key={k} s={s} k={k} onairos={onairos === "on"} peek={!tip && i === 0} />
             ))}
           </div>
@@ -645,7 +608,7 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
             <div className="flex items-center gap-3">
               <span className="min-w-0 flex-1">
                 <span className="block t-body font-medium text-ink">Share with the residency</span>
-                <span className="mt-1 block t-label text-ink-3">Your name and these five parts join the cohort graph, so Force can suggest people. Never your recordings or links.</span>
+                <span className="mt-1 block t-label text-ink-3">Your name and these four parts join the cohort graph, so Force can suggest people. Never your recordings or links.</span>
               </span>
               <Toggle on={s.shared} onChange={(v) => r.setShared(v)} label="Share with the residency" />
             </div>
@@ -653,15 +616,17 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
               <div className="mt-4 flex items-center gap-3 border-t border-[var(--fill)] pt-4">
                 <span className="min-w-0 flex-1">
                   <span className="block t-body font-medium text-ink">Show how you come across</span>
-                  <span className="mt-1 block t-label text-ink-3">Your archetype, summary and strengths on your page for residents. Never what Onairos says you could improve.</span>
+                  <span className="mt-1 block t-label text-ink-3">Your archetype, summary and strengths on your page for residents.</span>
                 </span>
                 <Toggle on={sharePersona} onChange={(v) => r.setSharePersona(v)} label="Show how you come across" />
               </div>
             )}
-            <p className="mt-4 flex items-center gap-[6px] t-label" style={{ color: approved ? "var(--sage-7)" : undefined }}>
-              <span className="h-[6px] w-[6px] shrink-0 rounded-full" style={{ background: approved ? "var(--sage-4)" : "var(--grey-300)" }} aria-hidden />
-              <span className={approved ? "" : "text-ink-3"}>{status}</span>
-            </p>
+            {approved && (
+              <p className="mt-4 flex items-center gap-[6px] t-label" style={{ color: "var(--sage-7)" }}>
+                <span className="h-[6px] w-[6px] shrink-0 rounded-full" style={{ background: "var(--sage-4)" }} aria-hidden />
+                <span>{status}</span>
+              </p>
+            )}
           </div>
           {approved && s.shared && mine.length > 0 && (
             <ul className="mt-2 flex flex-col gap-2">

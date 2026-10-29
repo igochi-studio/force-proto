@@ -51,8 +51,6 @@ export default function ConnectionPage({ id, say = false }: { id: string; say?: 
         ["Working on", theirs.intent],
         ["The problem", theirs.problem],
         ["Stuck on", theirs.current_frontier],
-        ["Can offer", theirs.contribution.can_offer.join(", ")],
-        ["Looking for", theirs.contribution.seeking.join(", ")],
       ].filter(([, v]) => v) as [string, string][])
     : [];
   // Messages between residents don't run inside Force yet, so the hello goes the way people

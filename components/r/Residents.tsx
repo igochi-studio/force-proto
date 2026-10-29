@@ -131,7 +131,7 @@ function People() {
   );
 }
 
-// ── Side quests: after the residency ──
+// ── Side quests: coming soon ──
 // A preview of where Force is going: what you and someone here could go and do together.
 // Not part of the residency build, so the covers are shown, not opened.
 function SideQuests() {
@@ -141,10 +141,10 @@ function SideQuests() {
     <section className="mt-10">
       <div className="mb-3 flex items-baseline justify-between px-1">
         <h2 className="t-body text-ink-3">Side quests</h2>
-        <span className="rounded-full bg-fill px-2 py-[2px] t-meta text-ink-2">Coming after the residency</span>
+        <span className="rounded-full bg-fill px-2 py-[2px] t-meta text-ink-2">Coming soon</span>
       </div>
       <p className="mb-3 px-1 t-label text-ink-3">Where Force is heading: something real to do together, picked from the patterns you share.</p>
-      <ul className="grid grid-cols-2 gap-3" aria-label="Side quests, coming after the residency">
+      <ul className="grid grid-cols-2 gap-3" aria-label="Side quests, coming soon">
         {quests.map((p, i) => {
           const wide = odd && i === quests.length - 1;
           return (

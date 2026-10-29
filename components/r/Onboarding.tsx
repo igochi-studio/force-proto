@@ -12,7 +12,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { Keyboard } from "lucide-react";
 import type { Art, Clip } from "@/data/mira";
 import { LINKS, QUESTIONS } from "@/data/residency";
-import { FIELDS, OFFER_TAGS, SEEK_TAGS, isEmpty } from "@/contract/residency";
+import { OFFER_TAGS, SEEK_TAGS, isEmpty } from "@/contract/residency";
+import { PARTS } from "./Painted";
 import { f } from "@/lib/f/store";
 import { r, useR } from "@/lib/f/residency";
 import PaintedMark from "../f/PaintedMark";
@@ -172,7 +173,7 @@ function Talk({ onNext }: { onNext: () => void }) {
     (async () => {
       const first = name.trim().split(/\s+/)[0];
       const looking = useR.getState().footprint.status === "busy";
-      await say(`${first ? `Hi ${first}. ` : ""}Three questions about what you want from the residency. Tap the bubble and talk, or type if you'd rather. About five minutes in all.${looking ? " While we talk, I'm reading what's public about you." : ""}`, 350);
+      await say(`${first ? `Hi ${first}. ` : ""}Three questions about what you're working on. Tap the bubble and talk, or type if you'd rather. About five minutes in all.${looking ? " While we talk, I'm reading what's public about you." : ""}`, 350);
       await say(QUESTIONS[0], 500);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once
@@ -204,8 +205,8 @@ function Talk({ onNext }: { onNext: () => void }) {
       await say(QUESTIONS[qi + 1], 450);
       return;
     }
-    // The two optional contribution questions are off for now (the team's call); what you
-    // can offer and seek can still be added on your snapshot page.
+    // The two optional contribution questions are off (the team's call), and with the
+    // residency over, the snapshot page doesn't ask for them either.
     await say("That's all three. Thank you.", 350);
     await draft();
   };
@@ -411,7 +412,7 @@ function MapCard({ onOpen, onRead }: { onOpen: () => void; onRead: () => void })
     const id = setInterval(() => setStep((x) => Math.min(x + 1, 4)), 2600);
     return () => clearInterval(id);
   }, [snapshot]);
-  const filled = snapshot ? FIELDS.filter((k) => !isEmpty(snapshot, k)).length : 0;
+  const filled = snapshot ? PARTS.filter((k) => !isEmpty(snapshot, k)).length : 0;
   return (
     <button type="button" disabled={!ready} onClick={onOpen} className="press block w-full overflow-hidden rounded-[24px] bg-paper text-left disabled:active:scale-100" style={{ boxShadow: "var(--lift-1)" }}>
       <span className="flex h-11 items-center justify-between px-4 pt-1">
@@ -444,7 +445,7 @@ function MapCard({ onOpen, onRead }: { onOpen: () => void; onRead: () => void })
             <span className="block t-body font-semibold text-ink">Here&apos;s what Force understands so far</span>
             <span className="mt-1 block t-label text-ink-3">
               {snapshot.noticed?.length ? `${snapshot.noticed.length} things Force noticed · ` : ""}
-              {filled < 5 ? `${5 - filled} for you to add · ` : ""}tap to check
+              {filled < PARTS.length ? `${PARTS.length - filled} for you to add · ` : ""}tap to check
             </span>
           </>
         ) : (
