@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, useTransform } from "motion/react";
-import { CONNECTION_LABEL, FIELDS, QUESTIONS, visible, FIELD_LABEL, FIELD_MEANING, OFFER_TAGS, SEEK_TAGS, coverageLine, isEmpty, type Field, type Snapshot } from "@/contract/residency";
+import { CONNECTION_LABEL, FIELDS, QUESTIONS, visible, FIELD_LABEL, FIELD_MEANING, OFFER_TAGS, SEEK_TAGS, isEmpty, type Field, type Snapshot } from "@/contract/residency";
 import { residentById, youWorld, type NodeKind } from "@/data/residency";
 import { f } from "@/lib/f/store";
 import { r, useR } from "@/lib/f/residency";
@@ -20,6 +20,7 @@ import Nav, { BlurBottom } from "../f/Nav";
 import MapFrame from "./MapFrame";
 import { Band, FIELD_ART, ForceMark, InsightDeck, cropOf } from "./Painted";
 import { LensBars, WordsBar } from "./Charts";
+import Traits from "./Traits";
 import { COHORT } from "@/lib/r/api";
 import Glass from "../f/Glass";
 import { LinkList, LookupCard, NameField, OnairosCard } from "./Links";
@@ -566,8 +567,21 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
               <ForceMark size={26} /> What Force noticed
               <span className="t-meta font-normal text-ink-3">swipe</span>
             </h3>
-            <InsightDeck items={s.noticed} foot={persona && <p className="mt-1 px-1 t-meta text-ink-3">{`Onairos${persona.fixture ? " (sample data)" : ""}: ${coverageLine(persona).replace(/^Based on/, "based on")} A read from a sample, never shared.`}</p>} />
+            <InsightDeck items={s.noticed} />
           </section>
+        )}
+
+        {persona ? (
+          <Traits p={persona} nudged={s.next_step?.source === "onairos_nudge"} />
+        ) : (
+          <button type="button" onClick={() => (haptic(), document.getElementById("onairos")?.scrollIntoView({ behavior: "smooth", block: "center" }))} className="press mt-8 flex w-full items-center gap-3 rounded-[24px] bg-fill px-4 py-3 text-left">
+            <Glass size={32} art="dusk" x={40} y={55} zoom={300} />
+            <span className="min-w-0 flex-1">
+              <span className="block t-body font-medium text-ink">How you come across</span>
+              <span className="block t-label text-ink-3">Connect Onairos to see your archetype and strengths.</span>
+            </span>
+            <I.Chevron size={16} className="shrink-0 text-ink-4" />
+          </button>
         )}
 
         <AtAGlance s={s} />
