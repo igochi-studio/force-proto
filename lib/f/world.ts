@@ -55,7 +55,8 @@ export function layout(nodes: WNode[], edges: [string, string][]): PNode[] {
 // share ends up between them, connected people drift close, and nobody's lines cross the
 // whole map. It lies flat, facing you, so a small cohort never hides anyone round the back.
 export const ORDER_COHORT: Record<NodeKind, number> = { you: 0, person: 0, intent: 1, theme: 2 };
-export function layoutCohort(nodes: WNode[], edges: [string, string][]): PNode[] {
+export const TIER: Record<NodeKind, number> = { you: 1.1, person: 1.1, intent: 0.72, theme: 0.36 };
+export function layoutCohort(nodes: WNode[], edges: [string, string][], tiers = false): PNode[] {
   const idx = new Map(nodes.map((n, i) => [n.id, i]));
   const k = nodes.length;
   // Start on a ring by kind, in a fixed order, so the same cohort always lands the same way.
@@ -101,6 +102,53 @@ export function layoutCohort(nodes: WNode[], edges: [string, string][]): PNode[]
       pos[i][0] += f[i][0] * sc;
       pos[i][1] += f[i][1] * sc;
     }
+  }
+  // Three rings, the founder's three kinds: people outside, what each wants to change inside
+  // them, the approaches in the middle where people meet. Each keeps the direction the
+  // simulation gave it, so neighbours stay neighbours.
+  if (tiers) {
+    const cx0 = pos.reduce((a, p) => a + p[0], 0) / Math.max(1, k);
+    const cy0 = pos.reduce((a, p) => a + p[1], 0) / Math.max(1, k);
+    const simA = pos.map((p) => Math.atan2(p[1] - cy0, p[0] - cx0));
+    const ang = new Array<number>(k).fill(0);
+    // Even spacing round a ring, in the order the simulation put things.
+    const spread = (ids: number[], start: number) =>
+      [...ids].sort((x, y) => ang[x] - ang[y]).forEach((i, r) => (ang[i] = start + (r / Math.max(1, ids.length)) * Math.PI * 2));
+    const people = nodes.map((n, i) => i).filter((i) => nodes[i].kind === "person" || nodes[i].kind === "you");
+    people.forEach((i) => (ang[i] = simA[i]));
+    spread(people, -Math.PI / 2);
+    nodes.forEach((n, i) => {
+      if (n.kind !== "intent") return;
+      const pa = edges.find(([, b]) => b === n.id)?.[0];
+      ang[i] = ang[idx.get(pa ?? "") ?? i] ?? simA[i];
+    });
+    const themes = nodes.map((n, i) => i).filter((i) => nodes[i].kind === "theme");
+    themes.forEach((i) => {
+      const from = edges.filter(([, b]) => b === nodes[i].id).map(([a]) => idx.get(a)).filter((j): j is number => j !== undefined);
+      const sx = from.reduce((t, j) => t + Math.cos(ang[j]), 0);
+      const sy = from.reduce((t, j) => t + Math.sin(ang[j]), 0);
+      ang[i] = from.length ? Math.atan2(sy, sx) : simA[i];
+    });
+    // Keep each approach facing the people who use it; push neighbours apart only as far as
+    // they need. Shared ones sit nearer the middle, one person's own nearer that person.
+    const gap = (Math.PI * 2) / Math.max(6, themes.length * 1.6);
+    const order = [...themes].sort((x, y) => ang[x] - ang[y]);
+    for (let it = 0; it < 80; it++)
+      order.forEach((i, r) => {
+        const j = order[(r + 1) % order.length];
+        if (i === j) return;
+        let d = ang[j] - ang[i];
+        while (d < 0) d += Math.PI * 2;
+        if (d < gap) {
+          ang[i] -= (gap - d) / 2;
+          ang[j] += (gap - d) / 2;
+        }
+      });
+    const owners = (i: number) => new Set(edges.filter(([, b]) => b === nodes[i].id).map(([a]) => nodes[idx.get(a) ?? 0]?.person)).size;
+    return nodes.map((n, i) => {
+      const r = n.kind === "theme" ? (owners(i) > 2 ? 0.18 : owners(i) > 1 ? 0.3 : 0.46) : TIER[n.kind];
+      return { ...n, p: [Math.cos(ang[i]) * r, Math.sin(ang[i]) * r * 0.92, 0.4] };
+    });
   }
   // Fit it to the frame, centred, a touch wider than tall like the phone's map.
   const xs = pos.map((p) => p[0]);

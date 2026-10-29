@@ -168,38 +168,34 @@ for (const run of runs) {
   });
   await shot("7-approve");
   await step("approve and on to the residency", () => tap(page.getByRole("button", { name: "Approve and share" })));
-  await step("home: cohort graph", async () => {
-    await page.getByRole("tab", { name: "People", selected: true }).waitFor({ timeout: 6000 });
-    await page.locator('canvas[aria-label^="The residency\'s graph"]').waitFor({ timeout: 3000 });
-    if (await page.locator('canvas[aria-label*="Arjun"]').count()) throw new Error("an unapproved resident is in the graph");
+  await step("home: you, Force, then the people (no graph in the flow)", async () => {
+    await page.getByRole("heading", { name: "People here" }).first().waitFor({ timeout: 6000 });
+    await page.getByRole("button", { name: /^Force/ }).waitFor({ timeout: 2000 });
+    if (await page.locator('canvas[aria-label^="The residency\'s graph"]').count()) throw new Error("the everyone graph is in the resident's flow");
+    if (await page.getByRole("button", { name: /^Arjun/ }).count()) throw new Error("an unapproved resident is listed");
   });
   await page.waitForTimeout(1500);
-  await shot("8-home-graph");
+  await shot("8-home");
   await step("people cards, connections first, with their reason", async () => {
-    await page.getByText("People here").waitFor({ timeout: 3000 });
+    await page.getByRole("heading", { name: "People here" }).first().waitFor({ timeout: 3000 });
     await page.waitForFunction(() => !document.body.innerText.includes("Force is reading everyone"), null, { timeout: 60000 });
     await tap(page.getByRole("button", { name: /, (Shared problem|Complementary approach|Shared exploration|Potential contribution)$/ }).first());
     await page.getByText("Something to explore together").waitFor({ timeout: 3000 });
     await page.getByText("Suggested by Force, not yet reviewed").waitFor({ timeout: 2000 });
   });
   await shot("9-connection");
-  await step("message from the connection", async () => {
+  await step("say hi: Force's draft, sent the way people already talk", async () => {
     await tap(page.getByRole("button", { name: /^Say hi to / }));
     await page.getByText("Force drafted this from both snapshots").waitFor({ timeout: 3000 });
-    await tap(page.getByRole("button", { name: "Send" }));
-    await page.getByText("Something to explore together:").first().waitFor({ timeout: 3000 });
-    await page.getByLabel("Message").fill("Would love to compare notes");
-    await page.getByLabel("Message").press("Enter");
-    await page.getByText("Would love to compare notes").last().waitFor({ timeout: 5000 });
+    await page.getByRole("button", { name: "Send on WhatsApp" }).waitFor({ timeout: 2000 });
+    await page.getByRole("button", { name: "Copy" }).waitFor({ timeout: 2000 });
   });
-  await shot("10-thread");
+  await shot("10-hello");
   await step("survives a refresh", async () => {
     await page.reload({ waitUntil: "networkidle" });
-    await page.getByRole("tab", { name: "People", selected: true }).waitFor({ timeout: 8000 });
-    await page.getByText("People here").waitFor({ timeout: 3000 });
+    await page.getByRole("heading", { name: "People here" }).first().waitFor({ timeout: 8000 });
   });
   await step("talk to Force", async () => {
-    await tap(page.getByRole("tab", { name: "Conversations" }));
     await tap(page.getByRole("button", { name: /^Force/ }));
     await page.getByText("What's on your mind?").waitFor({ timeout: 5000 });
     await page.getByLabel("Share your thoughts").fill("Long day of interviews");
@@ -207,6 +203,13 @@ for (const run of runs) {
     await page.getByText("Saved to memory").first().waitFor({ timeout: 6000 });
   });
   await shot("11-force");
+  await step("the graph for the pitch, on its own page", async () => {
+    await page.goto(URL.replace(/\/?(\?.*)?$/, "") + "/graph", { waitUntil: "networkidle" });
+    await page.getByRole("heading", { name: /Everyone, by what they/ }).waitFor({ timeout: 8000 });
+    await page.locator('canvas[aria-label^="The residency\'s graph"]').waitFor({ timeout: 3000 });
+  });
+  await page.waitForTimeout(1500);
+  await shot("12-graph");
 
   // The failure paths, once, in Chromium: Onairos not answering and synthesis failing must
   // each leave a readable way on, never an endless spinner.

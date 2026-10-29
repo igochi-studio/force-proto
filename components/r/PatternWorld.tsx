@@ -13,7 +13,7 @@
 import { useEffect, useRef } from "react";
 import { ART_SRC, ART_TONE, type Art } from "@/data/mira";
 import type { NodeKind, WNode } from "@/data/residency";
-import { BAND_ALPHA, GROWN_AT, ORDER_COHORT, RADIUS, bandOf, growth, layout, layoutCohort, nearness, project, type Camera, type PNode } from "@/lib/f/world";
+import { BAND_ALPHA, GROWN_AT, ORDER_COHORT, RADIUS, TIER, bandOf, growth, layout, layoutCohort, nearness, project, type Camera, type PNode } from "@/lib/f/world";
 import { painting } from "../f/Goo";
 import { haptic } from "../f/ui";
 
@@ -34,12 +34,15 @@ function blob() {
 const SPREAD = 1.7;
 const THRESH = 0.42;
 const DIM = -1; // a band for what's faded back behind the node you tapped
+// On the rings, each kind has its own size so the three read apart at a glance.
+const TIER_SIZE: Record<NodeKind, number> = { you: 15, person: 13, intent: 8, theme: 6 };
 const INK: Record<NodeKind, string> = { you: "#1c1b1a", intent: "#1c1b1a", theme: "#6b6966", person: "#4a4846" };
 
 type Bead = { x: number; y: number; r: number; art: Art; band: number };
 
-// layout: "you" puts you in the middle of your own map; "cohort" spreads everyone out.
-export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, interactive = true, layout: mode = "you" }: { nodes: WNode[]; edges: [string, string][]; focus: string | null; onTap?: (id: string | null) => void; onGrown?: () => void; interactive?: boolean; layout?: "you" | "cohort" }) {
+// layout: "you" puts you in the middle of your own map; "cohort" spreads everyone out;
+// "tiers" is the cohort on three rings (people, intent, approach), every name shown.
+export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, interactive = true, layout: mode = "you" }: { nodes: WNode[]; edges: [string, string][]; focus: string | null; onTap?: (id: string | null) => void; onGrown?: () => void; interactive?: boolean; layout?: "you" | "cohort" | "tiers" }) {
   const cv = useRef<HTMLCanvasElement>(null);
   const props = useRef({ focus, onTap, onGrown });
   const wake = useRef<() => void>(() => {});
@@ -65,8 +68,9 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
       const img = painting(a);
       if (!img.complete) img.addEventListener("load", () => kick(), { once: true });
     });
-    const world = mode === "cohort" ? layoutCohort(nodes, edges) : layout(nodes, edges);
-    const order = mode === "cohort" ? ORDER_COHORT : undefined;
+    const tiers = mode === "tiers";
+    const world = mode === "cohort" || tiers ? layoutCohort(nodes, edges, tiers) : layout(nodes, edges);
+    const order = mode === "cohort" || tiers ? ORDER_COHORT : undefined;
     const byId = new Map(world.map((n) => [n.id, n]));
     const font = getComputedStyle(document.body).fontFamily || "system-ui, sans-serif";
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -105,6 +109,8 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
         return;
       }
       const t = (now - born) / 1000;
+      // On a big screen (the pitch), nodes, strands and names grow with it.
+      const big = Math.max(1, Math.min(1.8, Math.min(W, H) / 420));
 
       // Camera: inertia after a drag, then a slow idle turn.
       C.yaw += C.vy;
@@ -148,23 +154,24 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
           if (u > b.g) break;
           const q = project([A.p[0] + (B.p[0] - A.p[0]) * u, A.p[1] + (B.p[1] - A.p[1]) * u, A.p[2] + (B.p[2] - A.p[2]) * u], C, W, H, 0.25 + 0.75 * b.g);
           const wave = 0.5 + 0.6 * Math.abs(Math.sin(u * len * 0.28 + ei * 1.7));
-          beads.push({ x: q.x, y: q.y, r: 1.3 * q.s * wave, art: B.art, band: bandFor(q.z, lit(ai) && lit(bi)) });
+          beads.push({ x: q.x, y: q.y, r: 1.3 * big * q.s * wave, art: B.art, band: bandFor(q.z, lit(ai) && lit(bi)) });
         }
       });
       hits.length = 0;
-      const labels: { id: string; x: number; y: number; r: number; z: number; size: number; weight: number; text: string; alpha: number; color: string; first: boolean }[] = [];
+      const labels: { id: string; kind: NodeKind; x: number; y: number; r: number; z: number; size: number; weight: number; text: string; alpha: number; color: string; first: boolean }[] = [];
       const discs: { id: string; x: number; y: number; r: number }[] = [];
       world.forEach((n) => {
         const q = P.get(n.id)!;
         if (q.g <= 0.01) return;
-        const r = RADIUS[n.kind] * (mode === "cohort" && n.kind === "intent" ? 0.7 : 1) * q.s * (0.3 + 0.7 * q.g);
+        const r = big * (tiers ? TIER_SIZE[n.kind] : RADIUS[n.kind] * (mode === "cohort" && n.kind === "intent" ? 0.7 : 1)) * q.s * (0.3 + 0.7 * q.g);
         const band = bandFor(q.z, lit(n.id), n.kind === "you");
         beads.push({ x: q.x, y: q.y, r, art: n.art, band });
         hits.push({ n, x: q.x, y: q.y, r: Math.max(r, 18) });
-        const size = (n.kind === "you" ? 13 : n.kind === "intent" ? 12.5 : 11.5) * (0.85 + 0.2 * nearness(q.z));
+        const size = (n.kind === "you" ? 13 : n.kind === "intent" ? 12.5 : 11.5) * (0.85 + 0.2 * nearness(q.z)) * big;
         discs.push({ id: n.id, x: q.x, y: q.y, r });
         labels.push({
           id: n.id,
+          kind: n.kind,
           x: q.x,
           y: q.y,
           r,
@@ -233,6 +240,25 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         });
 
+      // On the rings, the rings themselves: faint guides for people, intent and approach.
+      if (tiers) {
+        ctx.save();
+        ctx.strokeStyle = "rgba(28, 27, 26, 0.07)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 5]);
+        for (const r of [TIER.person, TIER.intent, TIER.theme]) {
+          ctx.beginPath();
+          for (let i = 0; i <= 96; i++) {
+            const a = (i / 96) * Math.PI * 2;
+            const q = project([Math.cos(a) * r, Math.sin(a) * r * 0.92, 0.4], C, W, H, 1);
+            if (i) ctx.lineTo(q.x, q.y);
+            else ctx.moveTo(q.x, q.y);
+          }
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
       // Names beside their nodes, nearest first. Each tries below, above, right and left of
       // its node and takes the spot that covers the fewest other names, nodes and strands; a
       // name that can only sit on another name waits (the one you tapped never does).
@@ -269,6 +295,13 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
           if (!best || (best.cost >= 1000 && !l.first)) return;
           placed.push(best.box);
           ctx.globalAlpha = l.alpha;
+          // Approaches on the rings read as tags: a soft grey capsule behind the word.
+          if (tiers && l.kind === "theme") {
+            ctx.fillStyle = "#efedea";
+            ctx.beginPath();
+            ctx.roundRect(best.box[0] - 3, best.box[1] - 2, best.box[2] - best.box[0] + 6, best.box[3] - best.box[1] + 3, 999);
+            ctx.fill();
+          }
           ctx.fillStyle = l.color;
           ctx.fillText(l.text, best.x, best.y);
         });
@@ -379,5 +412,5 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sig stands in for nodes and edges
   }, [sig, interactive, mode]);
 
-  return <canvas ref={cv} className="block h-full w-full" style={{ touchAction: "pan-y", pointerEvents: interactive ? "auto" : "none" }} role="img" aria-label={mode === "cohort" ? `The residency's graph: ${nodes.filter((n) => n.kind === "person" || n.kind === "you").map((n) => n.title).join(", ")}` : `Your pattern map: ${nodes.filter((n) => n.kind === "intent").map((n) => n.title).join(", ")}`} />;
+  return <canvas ref={cv} className="block h-full w-full" style={{ touchAction: "pan-y", pointerEvents: interactive ? "auto" : "none" }} role="img" aria-label={mode !== "you" ? `The residency's graph: ${nodes.filter((n) => n.kind === "person" || n.kind === "you").map((n) => n.title).join(", ")}` : `Your pattern map: ${nodes.filter((n) => n.kind === "intent").map((n) => n.title).join(", ")}`} />;
 }

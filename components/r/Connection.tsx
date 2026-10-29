@@ -8,6 +8,7 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { Copy, HandHelping, MessageCircleQuestionMark, Puzzle, Target } from "lucide-react";
 import { CONNECTION_BADGE, CONNECTION_LABEL, FIELD_LABEL, isConnection, type Connection, type Evidence, type Snapshot } from "@/contract/residency";
 import { residentById } from "@/data/residency";
 import { f } from "@/lib/f/store";
@@ -21,13 +22,14 @@ import { Band } from "./Painted";
 import Glass from "../f/Glass";
 import { Logo, SPRING, haptic } from "../f/ui";
 
-// flat: inside a white card (grey, no lift), never white on white.
-export function Badge({ c, flat = false }: { c: Connection; flat?: boolean }) {
-  const b = CONNECTION_BADGE[c.type];
+// How you're connected, the iOS way: a symbol and a word in secondary text, no pills.
+const KIND_ICON = { shared_problem: Target, complementary_approach: Puzzle, shared_exploration: MessageCircleQuestionMark, potential_contribution: HandHelping } as const;
+export function Kind({ c, className = "" }: { c: Connection; className?: string }) {
+  const Ic = KIND_ICON[c.type];
   return (
-    <span className={`inline-flex items-center gap-[6px] whitespace-nowrap rounded-full px-2 py-[2px] t-meta font-medium text-ink ${flat ? "bg-fill" : "bg-paper"}`} style={flat ? undefined : { boxShadow: "var(--lift-1)" }}>
-      <span className="h-[7px] w-[7px] rounded-full" style={{ background: `var(--${b.hue}-4)` }} aria-hidden />
-      {b.label}
+    <span className={`flex items-center gap-1 t-label text-ink-2 ${className}`}>
+      <Ic size={14} strokeWidth={1.75} absoluteStrokeWidth className="shrink-0 text-ink-3" aria-hidden />
+      {CONNECTION_BADGE[c.type].label}
     </span>
   );
 }
@@ -58,12 +60,21 @@ export default function ConnectionPage({ id, say = false }: { id: string; say?: 
         ["Looking for", theirs.contribution.seeking.join(", ")],
       ].filter(([, v]) => v) as [string, string][])
     : [];
-  const send = () => {
+  // Messages between residents don't run inside Force yet, so the hello goes the way people
+  // here already talk: WhatsApp, or copied to paste anywhere.
+  const whatsapp = () => {
     if (!text.trim()) return;
     haptic("done");
-    f.openThread(id, conn ? { why: conn.why_connected, explore: conn.what_to_explore } : undefined);
-    f.dmSend(id, text);
-    f.push({ name: "dm", id });
+    window.open(`https://wa.me/?text=${encodeURIComponent(text.trim())}`, "_blank", "noopener");
+  };
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text.trim());
+      haptic("done");
+      f.toast("Copied. Paste it wherever you two talk.");
+    } catch {
+      f.toast("Couldn't copy on this browser.");
+    }
   };
 
   return (
@@ -72,10 +83,8 @@ export default function ConnectionPage({ id, say = false }: { id: string; say?: 
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-[72px]">
         <div className="px-1">
           <Face face={p.face} size={80} />
-          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className="t-large text-ink">{p.name}</h1>
-            {conn && <Badge c={conn} />}
-          </div>
+          <h1 className="mt-4 t-large text-ink">{p.name}</h1>
+          {conn && <Kind c={conn} className="mt-1" />}
           <p className="mt-1 t-body text-ink-3">{p.work}</p>
           {!!theirs?.approach.length && (
             <div className="mt-3 flex flex-wrap gap-[6px]">
@@ -154,17 +163,21 @@ export default function ConnectionPage({ id, say = false }: { id: string; say?: 
               </p>
               {editing ? (
                 <div className="-mx-1 mt-1 rounded-[18px] bg-fill px-3">
-                  <Grow value={text} onChange={setText} onSend={() => setEditing(false)} autoFocus aria-label={`Message to ${p.name}`} max={5} />
+                  <Grow value={text} onChange={setText} onSend={() => setEditing(false)} autoFocus aria-label={`Hello to ${p.name}`} max={5} />
                 </div>
               ) : (
                 <p className="mt-2 line-clamp-4 t-body text-ink">{text}</p>
               )}
-              <div className="mt-3 flex items-center justify-end gap-2">
+              <div className="mt-3 flex items-center gap-2">
                 <button type="button" onClick={() => (haptic(), setEditing(!editing))} className="press h-10 rounded-full bg-fill px-4 t-label font-medium text-ink">
                   {editing ? "Done" : "Edit"}
                 </button>
-                <button type="button" onClick={send} disabled={!text.trim()} className="press h-10 rounded-full bg-ink px-5 t-label font-medium text-paper disabled:opacity-20">
-                  Send
+                <span className="flex-1" />
+                <button type="button" onClick={copy} disabled={!text.trim()} aria-label="Copy" className="press grid h-10 w-10 place-items-center rounded-full bg-fill text-ink disabled:opacity-20">
+                  <Copy size={16} strokeWidth={1.75} absoluteStrokeWidth />
+                </button>
+                <button type="button" onClick={whatsapp} disabled={!text.trim()} className="press h-10 rounded-full bg-ink px-4 t-label font-medium text-paper disabled:opacity-20">
+                  Send on WhatsApp
                 </button>
               </div>
             </motion.div>
