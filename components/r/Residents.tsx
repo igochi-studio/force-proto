@@ -16,6 +16,7 @@ import { COHORT } from "@/lib/r/api";
 import { otherIn, useCohort } from "@/lib/r/cohort";
 import Face from "../f/Face";
 import Glass from "../f/Glass";
+import { BlurTop } from "../f/Nav";
 import { I, Logo, haptic } from "../f/ui";
 import { Kind } from "./Connection";
 
@@ -26,6 +27,8 @@ export default function Residents() {
   const line = snapshot?.titles?.intent ? `Here for: ${snapshot.titles.intent.toLowerCase()}` : snapshot?.status === "approved" ? (snapshot.shared ? "Shared with the residency" : "Approved, private") : "Your snapshot";
   return (
     <div className="absolute inset-0 flex flex-col overflow-hidden" style={{ paddingTop: "var(--sat)", paddingBottom: "var(--sab)" }}>
+      {/* What scrolls up under the status bar blurs away */}
+      <BlurTop height={20} />
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-3">
         <button type="button" aria-label={`${name || "You"}: what Force understands about you`} onClick={() => (haptic(), f.push({ name: "persona" }))} className="press flex w-full items-center gap-3 rounded-full text-left">
           <Glass size={44} {...ME_FACE} zoom={260} />

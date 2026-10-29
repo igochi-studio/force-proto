@@ -17,6 +17,17 @@ export function BlurTop({ height = 72 }: { height?: number }) {
   );
 }
 
+// Above a bottom bar: what scrolls into it blurs and fades, so there's never a hard edge.
+export function BlurBottom({ height = 40 }: { height?: number }) {
+  return (
+    <div className="blur-bottom" style={{ height }} aria-hidden>
+      <i />
+      <i />
+      <i />
+    </div>
+  );
+}
+
 // Memory lives to the left of the chat, so its pages go back from the left; the Energy map
 // lives to the right, so its pages go back from the right.
 export default function Nav({ title, right, onBack, side = "left" }: { title?: React.ReactNode; right?: React.ReactNode; onBack?: () => void; side?: "left" | "right" }) {

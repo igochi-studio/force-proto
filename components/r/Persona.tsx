@@ -16,7 +16,7 @@ import { residentById, youWorld, type NodeKind } from "@/data/residency";
 import { f } from "@/lib/f/store";
 import { r, useR } from "@/lib/f/residency";
 import { otherIn, useCohort } from "@/lib/r/cohort";
-import Nav from "../f/Nav";
+import Nav, { BlurBottom } from "../f/Nav";
 import MapFrame from "./MapFrame";
 import { Band, FIELD_ART, ForceMark, InsightDeck, cropOf } from "./Painted";
 import { LensBars, WordsBar } from "./Charts";
@@ -103,13 +103,13 @@ function Swipe({ onRight, onLeft, right, left, children, className = "", style, 
   const rightA = useTransform(x, [0, 72], [0, 1]);
   const leftA = useTransform(x, [-72, 0], [1, 0]);
   return (
-    <div className="relative overflow-hidden rounded-[28px]">
+    <div className="relative rounded-[28px]">
       {onRight && (
-        <motion.span className="absolute inset-0 flex items-center gap-2 pl-5 t-body font-medium" style={{ opacity: rightA, color: "var(--sage-7)", background: "var(--sage-1)" }} aria-hidden>
+        <motion.span className="absolute inset-0 flex items-center gap-2 rounded-[28px] pl-5 t-body font-medium" style={{ opacity: rightA, color: "var(--sage-7)", background: "var(--sage-1)" }} aria-hidden>
           <I.Check size={18} /> {right}
         </motion.span>
       )}
-      <motion.span className="absolute inset-0 flex items-center justify-end gap-2 pr-5 t-body font-medium" style={{ opacity: leftA, color: "var(--rose-7)", background: "var(--rose-1)" }} aria-hidden>
+      <motion.span className="absolute inset-0 flex items-center justify-end gap-2 rounded-[28px] pr-5 t-body font-medium" style={{ opacity: leftA, color: "var(--rose-7)", background: "var(--rose-1)" }} aria-hidden>
         {left} <I.Close size={18} />
       </motion.span>
       <motion.div
@@ -647,7 +647,8 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
         </button>
       </div>
       {(!approved || onContinue) && (
-        <div className="shrink-0 px-4 pb-3 pt-2">
+        <div className="relative shrink-0 px-4 pb-3 pt-2">
+          <BlurBottom />
           {!approved && !canApprove && <p className="mb-2 px-1 text-center t-label text-ink-3">Add your intent or problem first.</p>}
           <button
             type="button"

@@ -21,6 +21,7 @@ import ResidencyOnboarding from "../r/Onboarding";
 import Persona from "../r/Persona";
 import Residents from "../r/Residents";
 import ConnectionPage from "../r/Connection";
+import { BlurTop } from "./Nav";
 import { useR } from "@/lib/f/residency";
 import { SPRING, haptic } from "./ui";
 
@@ -144,23 +145,27 @@ function Toast() {
     return () => clearTimeout(id);
   }, [toast]);
   return (
-    <div className="pointer-events-none absolute inset-x-0 z-[80] flex justify-center px-4" style={{ top: "calc(var(--sat) + 64px)" }}>
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            key={toast.key}
-            role="status"
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, transition: { duration: 0.15 } }}
-            transition={SPRING.ui}
-            className="pill pointer-events-auto h-10 max-w-full t-label"
-          >
-            <span className="truncate">{toast.text}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+    <AnimatePresence>
+      {toast && (
+        <motion.div key="toast" className="pointer-events-none absolute inset-x-0 top-0 z-[80]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.18 } }} transition={{ duration: 0.18 }}>
+          {/* What's underneath blurs away, so the message reads as sitting above the page */}
+          <BlurTop height={128} />
+          <div className="absolute inset-x-0 flex justify-center px-4" style={{ top: "calc(var(--sat) + 64px)" }}>
+            <motion.div
+              key={toast.key}
+              role="status"
+              initial={{ opacity: 0, y: -8, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={SPRING.ui}
+              className="pointer-events-auto flex h-11 max-w-full items-center rounded-full px-5 t-label font-medium text-ink backdrop-blur-xl"
+              style={{ background: "rgb(255 255 255 / 0.82)", boxShadow: "var(--lift-2)" }}
+            >
+              <span className="truncate">{toast.text}</span>
+            </motion.div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 

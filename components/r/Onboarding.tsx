@@ -16,6 +16,7 @@ import { FIELDS, OFFER_TAGS, SEEK_TAGS, isEmpty } from "@/contract/residency";
 import { f } from "@/lib/f/store";
 import { r, useR } from "@/lib/f/residency";
 import PaintedMark from "../f/PaintedMark";
+import { BlurBottom } from "../f/Nav";
 import VoiceMode from "../f/VoiceMode";
 import { AudioBubble, Bubble, Typing } from "../f/Bubbles";
 import Glass from "../f/Glass";
@@ -117,7 +118,8 @@ function Connect({ onNext }: { onNext: () => void }) {
         <LinkList className="mt-2" />
         <OnairosCard className="mt-6" />
       </div>
-      <div className="shrink-0 px-4 pb-3 pt-2">
+      <div className="relative shrink-0 px-4 pb-3 pt-2">
+        <BlurBottom />
         <Primary onClick={onNext}>{filled || onairos === "on" ? "Continue" : "Continue without these"}</Primary>
       </div>
     </>
@@ -291,7 +293,8 @@ function Talk({ onNext }: { onNext: () => void }) {
       </ul>
 
       {/* Kept out of the photograph the water bends, so the orb never wobbles under itself */}
-      <div data-no-shot className="shrink-0 px-4 pb-3 pt-1">
+      <div data-no-shot className="relative shrink-0 px-4 pb-3 pt-1">
+        <BlurBottom />
         {phase === "done" ? (
           <Primary onClick={() => (haptic("soft"), setOpen(true))}>Check what Force understood</Primary>
         ) : phase === "ask" ? (

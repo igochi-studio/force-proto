@@ -16,7 +16,7 @@ import { useR } from "@/lib/f/residency";
 import { COHORT } from "@/lib/r/api";
 import { useCohort } from "@/lib/r/cohort";
 import Face from "../f/Face";
-import Nav from "../f/Nav";
+import Nav, { BlurBottom } from "../f/Nav";
 import Grow from "./Grow";
 import { Band } from "./Painted";
 import Glass from "../f/Glass";
@@ -147,8 +147,7 @@ export default function ConnectionPage({ id, say = false }: { id: string; say?: 
       </div>
 
       <div className="relative shrink-0 px-4 pb-3 pt-2">
-        {/* A soft edge so the page reads as running under the draft, not cut by it */}
-        <span className="pointer-events-none absolute inset-x-0 -top-6 h-6" style={{ background: "linear-gradient(to top, var(--canvas), transparent)" }} aria-hidden />
+        <BlurBottom />
         <AnimatePresence initial={false} mode="popLayout">
           {writing ? (
             <motion.div key="write" className="rounded-[26px] bg-paper p-4" style={{ boxShadow: "var(--lift-2)" }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.1 } }} transition={SPRING.ui}>
