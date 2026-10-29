@@ -99,6 +99,8 @@ export function Logo({ size = 40, className = "" }: { size?: number; className?:
 // Web stand-in for UIImpactFeedbackGenerator. Only Android vibrates; iOS Safari is silent.
 export function haptic(kind: "tick" | "soft" | "done" = "tick") {
   try {
+    // Chrome refuses (and logs it) until the page has had a tap; things Force does on its own come first.
+    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
     navigator.vibrate?.(kind === "tick" ? 6 : kind === "soft" ? 12 : [10, 40, 16]);
   } catch {}
 }

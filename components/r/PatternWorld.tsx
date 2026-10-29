@@ -117,7 +117,9 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
       C.pitch = Math.max(-1, Math.min(1, C.pitch + C.vp));
       C.vy *= 0.94;
       C.vp *= 0.94;
-      if (!told && (reduce || t > GROWN_AT)) {
+      // Told only once someone's listening: a snapshot that adds no nodes (nothing Force could
+      // tell from the answers) doesn't redraw the map, so a tell spent early would never come.
+      if (!told && props.current.onGrown && (reduce || t > GROWN_AT)) {
         told = true;
         props.current.onGrown?.();
       }

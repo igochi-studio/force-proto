@@ -148,7 +148,10 @@ for (const run of runs) {
   });
   await step("how you come across, with the suggested action inside it", async () => {
     await page.getByText("How you come across").first().waitFor({ timeout: 3000 });
-    await page.getByRole("group", { name: "Strengths chart" }).first().waitFor({ timeout: 2000 });
+    // Strengths by name, strongest first, with why beside them. Never a score per trait.
+    await page.getByText("Your strengths").first().waitFor({ timeout: 2000 });
+    await page.getByText("Why these").first().waitFor({ timeout: 2000 });
+    if (await page.getByRole("group", { name: "Strengths chart" }).count()) throw new Error("strengths are back as a chart");
     if (await page.getByText("At a glance").count()) throw new Error("At a glance should be gone");
   });
   await step("settings holds the sources, not the page", async () => {

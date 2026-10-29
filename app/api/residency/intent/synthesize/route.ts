@@ -17,6 +17,8 @@ export async function POST(req: Request) {
   } catch {
     return Response.json({ error: "Expected answers and a resident id." }, { status: 400 });
   }
+  // Optional now: the app no longer asks what you'd offer or look for.
+  input.contribution = { can_offer: input.contribution?.can_offer ?? [], seeking: input.contribution?.seeking ?? [] };
   const draft = synthesize(input);
   if (!hasClaude()) return Response.json(draft);
   try {

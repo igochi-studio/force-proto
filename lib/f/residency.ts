@@ -42,8 +42,12 @@ const fresh = (): R => ({ done: false, me: id(), name: "", links: {}, extra: [],
 const load = (): R => {
   try {
     if (typeof window === "undefined") return fresh();
-    if (new URLSearchParams(window.location.search).get("reset") === "1") {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("reset") === "1") {
       localStorage.removeItem(KEY);
+      // Once: a refresh after this keeps what you've done since.
+      q.delete("reset");
+      window.history.replaceState(window.history.state, "", `${window.location.pathname}${q.size ? `?${q}` : ""}${window.location.hash}`);
       return fresh();
     }
     const s = localStorage.getItem(KEY);

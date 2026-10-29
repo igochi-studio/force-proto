@@ -18,6 +18,8 @@ export async function POST(req: Request) {
   } catch {
     return Response.json({ error: "Expected your snapshot." }, { status: 400 });
   }
+  // Optional now: the app no longer asks what you'd offer or look for.
+  me.contribution = { can_offer: me.contribution?.can_offer ?? [], seeking: me.contribution?.seeking ?? [] };
   if (!visible(me)) return Response.json({ mine: [] });
   const others = COHORT.filter((s) => visible(s) && s.resident_id !== me.resident_id);
   if (!hasClaude()) return Response.json({ mine: suggestConnections(me, others), source: "rules" });

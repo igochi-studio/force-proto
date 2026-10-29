@@ -85,7 +85,8 @@ function WhatItRead({ p, mine }: { p: OnairosNormalized; mine: boolean }) {
 
 export default function Traits({ p, who, children }: { p: OnairosNormalized; who?: string; children?: React.ReactNode }) {
   const top = p.positive.slice(0, 5);
-  if (!p.archetype && !p.summary && !top.length) return null;
+  // Nothing to show of Onairos, but whatever sits inside it (your suggested action) still does.
+  if (!p.archetype && !p.summary && !top.length) return <>{children}</>;
   const mine = !who;
   return (
     <section className="mt-8">

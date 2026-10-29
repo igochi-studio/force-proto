@@ -477,6 +477,7 @@ function Answer({ disabled, typed = false, onListen, onAnswer }: { disabled: boo
     if (!text.trim() || disabled) return;
     haptic();
     onAnswer({ text: text.trim() });
+    setText(""); // the last answer keeps this box until Force starts drafting
   };
 
   if (typing)
