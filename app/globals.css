@@ -213,6 +213,14 @@ button:disabled {
 .scroll-row::-webkit-scrollbar {
   display: none;
 }
+/* That extra room is only for shadows: taps go through it to whatever sits underneath, so a
+   row never blocks the button below it. The items themselves still take taps and swipes. */
+.scroll-row {
+  pointer-events: none;
+}
+.scroll-row > * {
+  pointer-events: auto;
+}
 .scroll-row::after {
   content: "";
   flex: 0 0 8px;
