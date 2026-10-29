@@ -572,7 +572,7 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
         )}
 
         {persona ? (
-          <Traits p={persona} nudged={s.next_step?.source === "onairos_nudge"} />
+          <Traits p={persona} nudged={s.next_step?.source === "onairos_nudge"} step={s.next_step && s.next_step.status !== "dismissed" ? { text: s.next_step.text, why: s.next_step.why_it_may_help } : null} />
         ) : (
           <button type="button" onClick={() => (haptic(), document.getElementById("onairos")?.scrollIntoView({ behavior: "smooth", block: "center" }))} className="press mt-8 flex w-full items-center gap-3 rounded-[24px] bg-fill px-4 py-3 text-left">
             <Glass size={32} art="dusk" x={40} y={55} zoom={300} />
@@ -598,7 +598,7 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
           </div>
         </section>
 
-        <section className="mt-8">
+        <section id="next-step" className="mt-8 scroll-mt-20">
           <H hint="Swipe right to accept, left to dismiss, tap to change it.">A useful next step</H>
           <NextStep s={s} />
         </section>

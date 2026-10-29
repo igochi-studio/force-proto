@@ -16,7 +16,7 @@ import { Band } from "./Painted";
 
 const PAINT = { backgroundImage: `url(${ART_SRC.dusk})`, backgroundSize: "400% 1200%", backgroundPosition: "40% 55%" };
 
-export default function Traits({ p, nudged }: { p: OnairosNormalized; nudged: boolean }) {
+export default function Traits({ p, nudged, step }: { p: OnairosNormalized; nudged: boolean; step?: { text: string; why: string } | null }) {
   const [open, setOpen] = useState<string | null>(null);
   const top = p.positive.slice(0, 5);
   if (!p.archetype && !p.summary && !top.length) return null;
@@ -84,9 +84,19 @@ export default function Traits({ p, nudged }: { p: OnairosNormalized; nudged: bo
             </div>
           )}
 
-          <p className="mt-4 t-meta text-ink-3">
-            {coverageLine(p)} {nudged ? "Its suggestion is your next step below." : ""} Only you see this; it never goes to the residency.
-          </p>
+          {/* The one suggested action: the same single next step as below, never a list of nudges */}
+          {step && (
+            <button type="button" onClick={() => (haptic(), document.getElementById("next-step")?.scrollIntoView({ behavior: "smooth", block: "center" }))} className="press mt-3 flex w-full items-start gap-3 rounded-[20px] bg-fill px-4 py-3 text-left">
+              <span className="min-w-0 flex-1">
+                <span className="block t-meta text-ink-3">{nudged ? "Suggested action · from Onairos" : "Suggested action"}</span>
+                <span className="mt-1 block t-body font-medium text-ink">{step.text}</span>
+                <span className="mt-1 block t-label text-ink-3">{step.why}</span>
+              </span>
+              <I.Chevron size={16} className="mt-1 shrink-0 text-ink-4" />
+            </button>
+          )}
+
+          <p className="mt-4 t-meta text-ink-3">{coverageLine(p)} Only you see this; it never goes to the residency.</p>
         </div>
       </div>
     </section>
