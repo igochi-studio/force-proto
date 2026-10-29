@@ -11,17 +11,21 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, useTransform } from "motion/react";
-import { CONNECTION_LABEL, FIELDS, QUESTIONS, FIELD_LABEL, FIELD_MEANING, OFFER_TAGS, SEEK_TAGS, coverageLine, isEmpty, type Field, type Snapshot } from "@/contract/residency";
+import { CONNECTION_LABEL, FIELDS, QUESTIONS, visible, FIELD_LABEL, FIELD_MEANING, OFFER_TAGS, SEEK_TAGS, coverageLine, isEmpty, type Field, type Snapshot } from "@/contract/residency";
 import { residentById, youWorld, type NodeKind } from "@/data/residency";
 import { f } from "@/lib/f/store";
 import { r, useR } from "@/lib/f/residency";
 import { otherIn, useCohort } from "@/lib/r/cohort";
 import Nav from "../f/Nav";
 import MapFrame from "./MapFrame";
+import { Band, FIELD_ART, ForceMark, InsightDeck, cropOf } from "./Painted";
+import { LensBars, WordsBar } from "./Charts";
+import { COHORT } from "@/lib/r/api";
+import Glass from "../f/Glass";
 import { LinkList, LookupCard, NameField, OnairosCard } from "./Links";
 import { AudioBubble } from "../f/Bubbles";
 import Grow from "./Grow";
-import { I, Logo, SPRING, haptic } from "../f/ui";
+import { I, SPRING, haptic } from "../f/ui";
 
 // ── Your map ──
 export function useYouWorld() {
@@ -57,11 +61,11 @@ function YouMap() {
               </button>
             </div>
             {n.line && (
-              <div className="mt-3 rounded-[18px] bg-fill px-4 py-3">
-                <p className="flex items-center gap-[6px] t-meta text-ink-3">
-                  <Logo size={12} /> {res ? "Why you're connected" : n.kind === "you" ? "What Force noticed" : "Force's take"}
+              <div className="mt-3 rounded-[20px] bg-fill px-4 py-3">
+                <p className="flex items-center gap-2 t-meta text-ink-3">
+                  <Glass size={20} art={n.art} zoom={320} /> {res ? "Why you're connected" : n.kind === "you" ? "What Force noticed" : "Force's take"}
                 </p>
-                <p className="mt-1 t-body text-ink">{n.line}</p>
+                <p className="mt-2 t-body text-ink">{n.line}</p>
               </div>
             )}
             {links.length > 0 && (
@@ -237,6 +241,8 @@ function FieldCard({ s, k, peek, onairos }: { s: Snapshot; k: Field; peek?: bool
     );
   const open = () => setEdit(k === "approach" ? s.approach.join(", ") : k === "contribution" ? "" : (s[k] ?? ""));
   const said = (s.provenance[k] ?? []).includes("user_edit");
+  const art = FIELD_ART[k];
+  const [, cx, cy] = cropOf(Object.keys(FIELD_ART).indexOf(k));
   if (empty)
     return (
       <button type="button" onClick={open} className="press block w-full rounded-[28px] bg-paper p-5 text-left" style={{ boxShadow: "var(--lift-1)" }}>
@@ -248,15 +254,17 @@ function FieldCard({ s, k, peek, onairos }: { s: Snapshot; k: Field; peek?: bool
       </button>
     );
   return (
-    <Swipe peek={peek} right="That's right" left="Not right" onRight={() => (r.confirmField(k), r.tipSeen())} onLeft={() => (r.tipSeen(), open())} className="rounded-[28px] bg-fill p-5 pr-12">
+    <Swipe peek={peek} right="That's right" left="Not right" onRight={() => (r.confirmField(k), r.tipSeen())} onLeft={() => (r.tipSeen(), open())} className="rounded-[28px] bg-paper p-5 pr-12" style={{ boxShadow: "var(--lift-1)" }}>
       <span className="pointer-events-none absolute right-4 top-5 text-ink-4" aria-hidden>
         <I.Edit size={16} />
       </span>
       <button type="button" onClick={open} aria-label={`${FIELD_LABEL[k]}: ${valueOf(s, k)}. Tap to rewrite.`} className="block w-full text-left">
-        <span className="block t-meta text-ink-3">{FIELD_LABEL[k]}</span>
-        <span className="mt-1 block whitespace-pre-line t-body font-semibold text-ink">{valueOf(s, k)}</span>
-        <span className="mt-2 flex items-center gap-[6px] t-label" style={said ? { color: "var(--sage-7)" } : undefined}>
-          {said && <span className="h-[6px] w-[6px] rounded-full" style={{ background: "var(--sage-4)" }} aria-hidden />}
+        <span className="flex items-center gap-2 t-meta text-ink-3">
+          <Glass size={22} art={art} x={cx} y={cy} zoom={320} /> {FIELD_LABEL[k]}
+        </span>
+        <span className="mt-2 block whitespace-pre-line t-body font-semibold text-ink">{valueOf(s, k)}</span>
+        <span className="mt-2 flex items-center gap-[6px] t-label" style={{ color: said ? "var(--sage-7)" : undefined }}>
+          {said && <I.Check size={13} />}
           <span className={said ? "" : "text-ink-3"}>{sourceOf(s, k, onairos)}</span>
         </span>
       </button>
@@ -348,10 +356,12 @@ function NextStep({ s }: { s: Snapshot }) {
     );
   const accepted = n.status === "accepted";
   return (
-    <Swipe right="Accept" left="Dismiss" onRight={accepted ? undefined : () => r.nextStep("accepted")} onLeft={() => r.nextStep("dismissed")} className="rounded-[28px] bg-paper p-5 pr-12" style={{ boxShadow: "var(--lift-1)" }}>
-      <span className="pointer-events-none absolute right-4 top-5 text-ink-4" aria-hidden>
+    <Swipe right="Accept" left="Dismiss" onRight={accepted ? undefined : () => r.nextStep("accepted")} onLeft={() => r.nextStep("dismissed")} className="overflow-hidden rounded-[28px] bg-paper" style={{ boxShadow: "var(--lift-1)" }}>
+      <Band art="hills" h={44} />
+      <span className="pointer-events-none absolute right-4 top-[64px] text-ink-4" aria-hidden>
         <I.Edit size={16} />
       </span>
+      <div className="p-5 pr-12">
       <button type="button" onClick={() => setEdit(n.text)} aria-label={`${n.text}. Tap to edit.`} className="block w-full text-left">
         <span className="block t-body font-semibold text-ink">{n.text}</span>
         <span className="mt-2 block t-label text-ink-3">Why this may help: {n.why_it_may_help}</span>
@@ -363,6 +373,7 @@ function NextStep({ s }: { s: Snapshot }) {
           </span>
         )}
       </button>
+      </div>
     </Swipe>
   );
 }
@@ -409,8 +420,10 @@ function Found() {
         <>
           <ul className="scroll-row no-scrollbar -mx-4 gap-2 px-4 pb-2" aria-label="What Force found">
             <AnimatePresence initial={false}>
-              {kept.map((x) => (
-                <motion.li key={x.id} layout exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }} transition={SPRING.move} className="flex w-[264px] shrink-0 flex-col rounded-[24px] bg-paper p-4" style={{ boxShadow: "var(--lift-1)" }}>
+              {kept.map((x, i) => (
+                <motion.li key={x.id} layout exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }} transition={SPRING.move} className="flex w-[264px] shrink-0 flex-col overflow-hidden rounded-[24px] bg-paper" style={{ boxShadow: "var(--lift-1)" }}>
+                  <Band i={i + 2} h={48} />
+                  <div className="flex flex-1 flex-col p-4">
                   <div className="flex items-start justify-between gap-2">
                     <span className="t-meta uppercase text-ink-3">{x.label}</span>
                     <button type="button" aria-label="Not me, remove" onClick={() => (haptic("soft"), r.dropFinding(x.id))} className="press hit -mr-1 -mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-fill text-ink-3">
@@ -430,6 +443,7 @@ function Found() {
                       {x.sources.length === 1 ? host(x.sources[0].url) : `${x.sources.length} sources`}
                     </span>
                   </div>
+                  </div>
                 </motion.li>
               ))}
             </AnimatePresence>
@@ -441,6 +455,26 @@ function Found() {
           )}
         </>
       )}
+    </section>
+  );
+}
+
+// ── At a glance: the analysis as pictures, from counts only ──
+function AtAGlance({ s }: { s: Snapshot }) {
+  const answers = useR((x) => x.answers);
+  const others = COHORT.filter((x) => visible(x) && x.resident_id !== s.resident_id);
+  const rows = s.approach.map((a) => {
+    const who = others.filter((o) => o.approach.some((b) => b.toLowerCase() === a.toLowerCase())).map((o) => o.name);
+    return { name: a, n: who.length, who };
+  });
+  if (!answers.some((a) => a.trim()) && !rows.length) return null;
+  return (
+    <section className="mt-8">
+      <H>At a glance</H>
+      <div className="flex flex-col gap-2">
+        <WordsBar answers={answers} />
+        <LensBars rows={rows} of={others.length} />
+      </div>
     </section>
   );
 }
@@ -527,23 +561,16 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
         </p>
 
         {!!s.noticed?.length && (
-          <section className="mt-6">
-            <div className="rounded-[28px] bg-paper p-5" style={{ boxShadow: "var(--lift-1)" }}>
-              <p className="flex items-center gap-2 t-label font-medium text-ink-2">
-                <Logo size={14} /> What Force noticed
-              </p>
-              <ul className="mt-1">
-                {s.noticed.map((x, i) => (
-                  <li key={i} className={`py-3 ${i ? "border-t border-[var(--fill)]" : ""}`}>
-                    <p className="t-body text-ink">{x.text}</p>
-                    <p className="mt-1 t-meta text-ink-3">{x.from.join(" · ")}</p>
-                  </li>
-                ))}
-              </ul>
-              {persona && <p className="mt-1 t-meta text-ink-3">{`Onairos${persona.fixture ? " (sample data)" : ""}: ${coverageLine(persona).replace(/^Based on/, "based on")} A read from a sample, never shared.`}</p>}
-            </div>
+          <section className="mt-8">
+            <h3 className="mb-3 flex items-center gap-2 px-1 t-body font-medium text-ink">
+              <ForceMark size={26} /> What Force noticed
+              <span className="t-meta font-normal text-ink-3">swipe</span>
+            </h3>
+            <InsightDeck items={s.noticed} foot={persona && <p className="mt-1 px-1 t-meta text-ink-3">{`Onairos${persona.fixture ? " (sample data)" : ""}: ${coverageLine(persona).replace(/^Based on/, "based on")} A read from a sample, never shared.`}</p>} />
           </section>
         )}
+
+        <AtAGlance s={s} />
 
         <Found />
 

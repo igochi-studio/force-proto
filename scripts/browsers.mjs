@@ -152,7 +152,7 @@ for (const run of runs) {
   });
   await step("correct the intent", async () => {
     // A recording Force couldn't make sense of leaves Intent unknown, which is right; add it.
-    await tap(page.getByRole("button", { name: /^Intent(:|\s+Force doesn)/ }).first());
+    await tap(page.getByRole("button", { name: /^Intent: .*Tap to rewrite\.$|^Intent\s+Force doesn/ }).first());
     await page.getByLabel("Intent, in your words").fill("Ship a memory prototype that five teams use daily.");
     await tap(page.getByRole("button", { name: "Save" }));
     await page.getByText("Ship a memory prototype that five teams use daily.").waitFor({ timeout: 2000 });

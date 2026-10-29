@@ -35,14 +35,22 @@ type Tab = "conversations" | "people";
 export default function Residents() {
   const tab = useR((s) => s.tab);
   const name = useR((s) => s.name);
+  const snapshot = useR((s) => s.snapshot);
+  // Under your name: what you're here for, in a few words, or where your snapshot stands.
+  const line = snapshot?.titles?.intent ? `Here for: ${snapshot.titles.intent.toLowerCase()}` : snapshot?.status === "approved" ? (snapshot.shared ? "Shared with the residency" : "Approved, private") : "Your snapshot";
   return (
     <div className="absolute inset-0 flex flex-col overflow-hidden" style={{ paddingTop: "var(--sat)", paddingBottom: "var(--sab)" }}>
-      {/* You first, then the people who share your patterns, then what you've started with them */}
-      <header className="flex h-[60px] shrink-0 items-center gap-3 px-4 pt-2">
-        <button type="button" aria-label={`${name || "You"}: who Force thinks you are`} onClick={() => (haptic(), f.push({ name: "persona" }))} className="press shrink-0 rounded-full">
+      {/* You first, on your own row; then the two halves of the residency underneath */}
+      <header className="shrink-0 px-4 pt-3">
+        <button type="button" aria-label={`${name || "You"}: what Force understands about you`} onClick={() => (haptic(), f.push({ name: "persona" }))} className="press flex w-full items-center gap-3 rounded-full text-left">
           <Glass size={44} {...ME_FACE} zoom={260} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate t-body font-semibold text-ink">{name.trim() || "You"}</span>
+            <span className="block truncate t-label text-ink-3">{line}</span>
+          </span>
+          <I.Chevron size={16} className="shrink-0 text-ink-4" />
         </button>
-        <div className="flex h-11 flex-1 rounded-full bg-paper p-1" style={{ boxShadow: "var(--lift-1)" }} role="tablist">
+        <div className="mt-3 flex h-11 rounded-full bg-paper p-1" style={{ boxShadow: "var(--lift-1)" }} role="tablist">
           {(["people", "conversations"] as Tab[]).map((t) => (
             <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => (haptic(), r.setTab(t))} className={`relative flex-1 rounded-full t-label font-medium transition-colors duration-200 ${tab === t ? "text-paper" : "text-ink-2"}`}>
               {tab === t && <motion.span layoutId="home-tab" className="absolute inset-0 rounded-full bg-ink" transition={SPRING.ui} />}
@@ -88,8 +96,8 @@ function Conversations() {
     const x = m ? ([...m].reverse().find((y) => y.from !== "force") ?? m[m.length - 1]) : null;
     return x ? (x.from === "me" ? `You: ${x.text}` : x.text) : null;
   };
-  // Threads you've opened first, then the ones nearest your patterns, then everyone.
-  const people = [...RESIDENTS].sort((a, b) => Number(!!dms[b.id]) - Number(!!dms[a.id]) || Number(!!conn(b.id)) - Number(!!conn(a.id)));
+  // Only the people you've actually talked to, newest first. Everyone else is in People.
+  const people = RESIDENTS.filter((p) => dms[p.id]?.length).sort((a, b) => (dms[b.id]?.length ?? 0) - (dms[a.id]?.length ?? 0));
   return (
     <ul className="flex flex-col gap-2">
       <li>
@@ -109,6 +117,7 @@ function Conversations() {
           <Row onClick={() => thread(p.id, conn(p.id))} icon={<Face face={p.face} size={44} />} title={p.name} line={last(p.id) ?? p.work} tag={conn(p.id) ? CONNECTION_LABEL[conn(p.id)!.type] : undefined} />
         </li>
       ))}
+      {!people.length && <li className="px-1 pt-2 t-label text-ink-3">Say hi to someone in People and your conversation shows up here.</li>}
     </ul>
   );
 }
@@ -185,11 +194,11 @@ function People() {
                 </button>
               </div>
               {read && (
-                <div className="mt-3 rounded-[18px] bg-fill px-4 py-3">
-                  <p className="flex items-center gap-[6px] t-meta text-ink-3">
-                    <Logo size={12} /> {read.head}
+                <div className="mt-3 rounded-[20px] bg-fill px-4 py-3">
+                  <p className="flex items-center gap-2 t-meta text-ink-3">
+                    <Glass size={20} art={n.art} zoom={320} /> {read.head}
                   </p>
-                  <p className="mt-1 t-body text-ink">{read.body}</p>
+                  <p className="mt-2 t-body text-ink">{read.body}</p>
                 </div>
               )}
               {around(n.id).length > 0 && (

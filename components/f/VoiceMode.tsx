@@ -209,12 +209,13 @@ export default function VoiceMode({ origin, shotOf, onClose, onStop, limit, onCl
               {orb.icon}
             </Glass>
           </span>
-          <p className="pointer-events-none absolute inset-x-0 text-center t-label text-ink-2 transition-opacity duration-300" style={{ top: origin.y - orb.size / 2 - 36, opacity: settled ? 1 : 0 }}>
+          {/* Its own pill, so it reads cleanly over whatever the conversation has behind it */}
+          <p className="pointer-events-none absolute left-1/2 flex max-w-[calc(100%-32px)] -translate-x-1/2 items-center whitespace-nowrap rounded-full bg-paper px-4 py-2 t-label text-ink-2 transition-opacity duration-300" style={{ top: origin.y - orb.size / 2 - 52, opacity: settled ? 1 : 0, boxShadow: "var(--lift-1)" }}>
             {rec ? (
               <>
                 <span className="t-num text-ink-3">{limit ? `${Math.max(0, limit - secs)}s` : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`}</span>
                 <span className="mx-2 text-ink-4">·</span>
-                {sample ? "No microphone, so this is a sample. Tap to finish." : "Listening. Tap anywhere when you're done."}
+                {sample ? "No microphone. Tap to finish." : "Listening · tap anywhere when done"}
               </>
             ) : (
               "One moment"

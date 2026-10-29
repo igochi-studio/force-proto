@@ -10,6 +10,7 @@ import type { Clip } from "@/data/mira";
 import type { LinkKind } from "@/data/residency";
 import { visible, type Connection, type Field, type Finding, type NextStep, type OnairosNormalized, type Snapshot, type SynthInput, type VoiceSignal } from "@/contract/residency";
 import * as api from "@/lib/r/api";
+import { f } from "./store";
 
 interface R {
   done: boolean;
@@ -96,7 +97,10 @@ const link = async () => {
   if (!s || !visible(s)) return set({ mine: [], linking: false });
   set({ linking: true });
   try {
-    set({ mine: await api.connections(s), linking: false });
+    const mine = await api.connections(s);
+    set({ mine, linking: false });
+    // The two closest matches start as conversations already under way.
+    mine.slice(0, 2).forEach((c) => f.seedThread(c.source === `person_${s.resident_id}` ? c.target.replace(/^person_/, "") : c.source.replace(/^person_/, ""), { why: c.why_connected, explore: c.what_to_explore }));
   } catch {
     set({ linking: false });
   }

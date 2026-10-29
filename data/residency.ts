@@ -66,15 +66,15 @@ export function youWorld(s: Snapshot | null, name: string, mine: Connection[] = 
   const edges: [string, string][] = [];
   if (!s) return { nodes, edges };
   if (s.intent) {
-    nodes.push({ id: "intent", kind: "intent", title: s.titles?.intent ?? title(s.intent), label: s.intent, line: s.takes?.intent, from: s.provenance.intent?.includes("user_edit") ? "You wrote this" : "Your answer to question 1", art: "meadow" });
+    nodes.push({ id: "intent", kind: "intent", title: s.titles?.intent ?? title(s.intent), label: s.intent, line: s.takes?.intent, from: s.provenance.intent?.includes("user_edit") ? "You wrote this" : "Your answer to question 1", art: "water" });
     edges.push(["you", "intent"]);
   }
   if (s.problem) {
-    nodes.push({ id: "problem", kind: "intent", title: s.titles?.problem ?? title(s.problem), label: s.problem, line: s.takes?.problem, from: s.provenance.problem?.includes("user_edit") ? "You wrote this" : "Your answer to question 2", art: "dusk" });
+    nodes.push({ id: "problem", kind: "intent", title: s.titles?.problem ?? title(s.problem), label: s.problem, line: s.takes?.problem, from: s.provenance.problem?.includes("user_edit") ? "You wrote this" : "Your answer to question 2", art: "hills" });
     edges.push(["you", "problem"]);
   }
   if (s.current_frontier) {
-    nodes.push({ id: "frontier", kind: "intent", title: "Open question", label: s.current_frontier, line: s.takes?.current_frontier, from: s.provenance.current_frontier?.includes("user_edit") ? "You wrote this" : "Your answer to question 3", art: "water" });
+    nodes.push({ id: "frontier", kind: "intent", title: "Open question", label: s.current_frontier, line: s.takes?.current_frontier, from: s.provenance.current_frontier?.includes("user_edit") ? "You wrote this" : "Your answer to question 3", art: "park" });
     edges.push([s.intent ? "intent" : "you", "frontier"]);
   }
   const hub = s.intent ? "intent" : s.problem ? "problem" : "you";

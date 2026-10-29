@@ -17,6 +17,8 @@ import { useCohort } from "@/lib/r/cohort";
 import Face from "../f/Face";
 import Nav from "../f/Nav";
 import Grow from "./Grow";
+import { Band } from "./Painted";
+import Glass from "../f/Glass";
 import { I, Logo, SPRING, haptic } from "../f/ui";
 
 export function Badge({ c }: { c: Connection }) {
@@ -97,9 +99,11 @@ export default function ConnectionPage({ id, say = false }: { id: string; say?: 
             <div className="rounded-[28px] bg-paper p-5" style={{ boxShadow: "var(--lift-1)" }}>
               <p className="t-meta text-ink-3">{CONNECTION_LABEL[conn.type]}</p>
               <p className="mt-1 t-title text-ink">{conn.why_connected}</p>
-              <div className="mt-4 rounded-[18px] bg-fill px-4 py-3">
-                <p className="t-meta text-ink-3">Something to explore together</p>
-                <p className="mt-1 t-body text-ink">{conn.what_to_explore}</p>
+              <div className="mt-4 rounded-[20px] bg-fill px-4 py-3">
+                <p className="flex items-center gap-2 t-meta text-ink-3">
+                  <Glass size={20} art={p.face.art} x={p.face.x} y={p.face.y} zoom={320} /> Something to explore together
+                </p>
+                <p className="mt-2 t-body text-ink">{conn.what_to_explore}</p>
               </div>
               <p className="mt-3 flex items-center gap-[6px] t-meta text-ink-3">
                 <span className="h-[6px] w-[6px] rounded-full" style={{ background: conn.origin === "reviewed" ? "var(--sage-4)" : "var(--grey-300)" }} aria-hidden />
@@ -115,11 +119,14 @@ export default function ConnectionPage({ id, say = false }: { id: string; say?: 
           <section className="mt-8">
             <h3 className="mb-3 px-1 t-body text-ink-3">Scoops</h3>
             <ul className="scroll-row no-scrollbar -mx-4 gap-2 px-4 pb-2">
-              {scoops.map(([k, v]) => (
-                <li key={k} className="flex w-[232px] shrink-0 flex-col rounded-[24px] bg-paper p-4" style={{ boxShadow: "var(--lift-1)" }}>
-                  <span className="t-meta uppercase text-ink-3">{k}</span>
-                  <p className="mt-2 flex-1 t-body text-ink">{v}</p>
-                  <span className="mt-3 t-meta text-ink-3">Their snapshot</span>
+              {scoops.map(([k, v], j) => (
+                <li key={k} className="flex w-[232px] shrink-0 flex-col overflow-hidden rounded-[24px] bg-paper" style={{ boxShadow: "var(--lift-1)" }}>
+                  <Band i={j} h={44} />
+                  <div className="flex flex-1 flex-col p-4">
+                    <span className="t-meta uppercase text-ink-3">{k}</span>
+                    <p className="mt-2 flex-1 t-body text-ink">{v}</p>
+                    <span className="mt-3 t-meta text-ink-3">Their snapshot</span>
+                  </div>
                 </li>
               ))}
             </ul>

@@ -193,6 +193,14 @@ export const f = {
       dms: { ...s.dms, [id]: lines.map((text) => ({ id: uid("d"), from: "force" as const, text })) },
     }));
   },
+  // The residency: a thread already under way with someone Force matched you with: Force
+  // says why, and they've said hello.
+  seedThread(id: string, intro: { why: string; explore: string }) {
+    const p = personById(id);
+    if (!p || get().dms[id]?.length) return;
+    f.openThread(id, intro);
+    set((s) => ({ dms: { ...s.dms, [id]: [...(s.dms[id] ?? []), { id: uid("d"), from: "them" as const, text: p.reply }] } }));
+  },
   setSetting(k: keyof Settings, v: boolean) {
     set((s) => ({ settings: { ...s.settings, [k]: v } }));
   },
