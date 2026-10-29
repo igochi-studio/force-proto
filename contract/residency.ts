@@ -137,6 +137,9 @@ export interface OnairosNormalized {
   archetype: string | null; // a small personal detail, never a matching key
   nudges: string[]; // candidates only; Force shows at most one, and only if it fits
   coverage: { analyzed: number | null; sampled: number | null; label: string | null; platforms: string[] };
+  // What each connected platform showed, in Onairos's words, when it says (e.g. reddit:
+  // "Strong community, technology, and learning interests.").
+  sources?: { platform: string; summary: string }[];
   fixture: boolean; // a labelled sample, not a real response
 }
 
@@ -150,6 +153,10 @@ const traits = (o?: Record<string, RawTrait>) =>
     .map(trait)
     .filter((t): t is Trait => !!t)
     .sort((a, b) => b.strength - a.strength);
+
+// "youtube" → "YouTube", "chatgpt" → "ChatGPT", anything else capitalised.
+const PLATFORMS: Record<string, string> = { youtube: "YouTube", chatgpt: "ChatGPT", reddit: "Reddit", instagram: "Instagram", linkedin: "LinkedIn", x: "X", twitter: "X", pinterest: "Pinterest", spotify: "Spotify", gmail: "Gmail" };
+const platformName = (k: string) => PLATFORMS[k.toLowerCase()] ?? k.charAt(0).toUpperCase() + k.slice(1);
 
 export function normalizeOnairos(raw: unknown, fixture = false): OnairosNormalized | null {
   if (!raw || typeof raw !== "object") return null;
@@ -169,8 +176,11 @@ export function normalizeOnairos(raw: unknown, fixture = false): OnairosNormaliz
       analyzed: typeof m.total_items_analyzed === "number" ? m.total_items_analyzed : null,
       sampled: typeof m.items_sampled === "number" ? m.items_sampled : null,
       label: str(m.coverage),
-      platforms: Object.keys(m.platform_breakdown ?? {}),
+      platforms: Object.keys(m.platform_breakdown ?? {}).map(platformName),
     },
+    sources: Object.entries(m.platform_breakdown ?? {})
+      .map(([k, v]) => ({ platform: platformName(k), summary: str((v as { summary?: string })?.summary) ?? "" }))
+      .filter((x) => x.summary),
     fixture,
   };
 }

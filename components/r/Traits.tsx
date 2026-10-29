@@ -2,82 +2,86 @@
 
 // "How you come across": what Onairos read from the apps someone connected. On your own page
 // it's yours, with the one suggested action under it; on a resident's page it's theirs, only
-// because they chose to share it. The archetype, the summary, the strengths as a chart (each
-// one's strength within its own trait, never compared with anyone; tap for where it showed),
-// why those strengths, and how much Onairos saw.
+// because they chose to share it. The archetype, the summary, the strengths by name (no
+// scores), why those strengths, and what Onairos read: how much, and from where.
 
 import { useState } from "react";
-import { coverageLine, type OnairosNormalized } from "@/contract/residency";
+import type { OnairosNormalized } from "@/contract/residency";
 import { ART_SRC } from "@/data/mira";
 import Glass from "../f/Glass";
 import { haptic } from "../f/ui";
-import { Band } from "./Painted";
+import { Band, cropOf } from "./Painted";
 
 const PAINT = { backgroundImage: `url(${ART_SRC.dusk})`, backgroundSize: "400% 1200%", backgroundPosition: "40% 55%" };
 
-// Strengths the way Health draws a week: the selected one large on top with where it showed,
-// tall rounded bars on faint gridlines below. Tap a bar to select it; it takes the painting,
-// the rest stay soft. Each value is that trait's own strength, out of 100.
-function StrengthsChart({ top, mine, p }: { top: OnairosNormalized["positive"]; mine: boolean; p: OnairosNormalized }) {
-  const [pick, setPick] = useState(top[0].name);
-  const t = top.find((x) => x.name === pick) ?? top[0];
-  const H = 168;
+// Strengths by name only, strongest first: the team doesn't show Onairos's numbers. Each is
+// a painted tile; tap one for where it showed when Onairos says.
+function Strengths({ top, mine, p }: { top: OnairosNormalized["positive"]; mine: boolean; p: OnairosNormalized }) {
+  const [pick, setPick] = useState<string | null>(null);
+  const t = top.find((x) => x.name === pick);
   return (
-    <figure className="mt-2 rounded-[28px] bg-paper p-5" style={{ boxShadow: "var(--lift-1)" }}>
-      <figcaption className="t-meta text-ink-3">Strengths</figcaption>
-      <div className="mt-2 flex items-baseline gap-2">
-        <span className="t-large tabular-nums text-ink">{t.strength}</span>
-        <span className="t-label text-ink-3">of 100</span>
-      </div>
-      <p className="t-body font-semibold text-ink">{t.name}</p>
-      <p className="mt-1 min-h-[40px] t-label text-ink-2">{t.evidence ?? (t.name === top[0].name ? `Shows up most ${mine ? "in what you do" : "for them"}.` : "")}</p>
-
-      <div className="relative mt-5" style={{ height: H }} role="group" aria-label="Strengths chart">
-        {[100, 50, 0].map((v) => (
-          <div key={v} className="pointer-events-none absolute inset-x-0 flex items-center gap-2" style={{ top: `${((100 - v) / 100) * H - 8}px` }} aria-hidden>
-            <span className="h-px flex-1" style={{ backgroundImage: "linear-gradient(to right, rgb(28 27 26 / 0.12) 50%, transparent 0)", backgroundSize: "6px 1px" }} />
-            <span className="w-6 text-right t-meta tabular-nums text-ink-4">{v}</span>
-          </div>
-        ))}
-        <div className="absolute inset-y-0 left-0 right-8 flex items-end justify-around gap-2">
-          {top.map((x) => {
-            const on = x.name === t.name;
-            return (
-              <button key={x.name} type="button" aria-pressed={on} aria-label={`${x.name}, ${x.strength} of 100`} onClick={() => (haptic(), setPick(x.name))} className="flex h-full max-w-[48px] flex-1 items-end justify-center">
-                <span className="block w-full rounded-[10px] transition-[background-color,opacity] duration-200" style={{ height: `${Math.max(4, x.strength)}%`, ...(on ? PAINT : { background: "#e6e3df" }) }} />
+    <div className="mt-2 rounded-[28px] bg-paper p-5" style={{ boxShadow: "var(--lift-1)" }}>
+      <p className="t-meta text-ink-3">{mine ? "Your strengths" : "Strengths"} · strongest first</p>
+      <ul className="mt-3 grid grid-cols-2 gap-2">
+        {top.map((x, i) => {
+          const [art, cx, cy] = cropOf(i);
+          const on = pick === x.name;
+          return (
+            <li key={x.name}>
+              <button type="button" aria-pressed={on} disabled={!x.evidence} onClick={() => (haptic(), setPick(on ? null : x.name))} className="press flex h-full w-full flex-col overflow-hidden rounded-[20px] bg-fill text-left">
+                <span className="block h-12 bg-cover" style={{ backgroundImage: `url(${ART_SRC[art]})`, backgroundPosition: `${cx}% ${cy}%`, backgroundSize: "300%" }} aria-hidden />
+                <span className="block px-3 pb-3 pt-2 t-label font-medium leading-snug text-ink">{x.name}</span>
               </button>
-            );
-          })}
-        </div>
-      </div>
-      <div className="mr-8 mt-2 flex justify-around gap-2" aria-hidden>
-        {top.map((x) => (
-          <span key={x.name} className={`max-w-[64px] flex-1 text-center t-meta leading-tight ${x.name === t.name ? "font-medium text-ink" : "text-ink-3"}`}>
-            {x.name}
-          </span>
-        ))}
-      </div>
-
+            </li>
+          );
+        })}
+      </ul>
+      {t?.evidence && <p className="mt-3 rounded-[16px] bg-fill px-3 py-2 t-label text-ink-2">{t.evidence}</p>}
       {p.explanation && (
-        <div className="mt-5 rounded-[20px] bg-fill px-4 py-3">
+        <div className="mt-4 rounded-[20px] bg-fill px-4 py-3">
           <p className="t-meta text-ink-3">Why these strengths</p>
           <p className="mt-1 t-body text-ink">{p.explanation}</p>
         </div>
       )}
-      <p className="mt-4 t-meta text-ink-3">
-        Each value is how strongly it showed {mine ? "in your apps" : "in their apps"}, never a comparison with anyone. {coverageLine(p)}
-      </p>
-      <table className="sr-only">
-        <caption>Strengths</caption>
-        <tbody>
-          {top.map((x) => (
-            <tr key={x.name}>
-              <th>{x.name}</th>
-              <td>{x.strength} of 100</td>
-            </tr>
+    </div>
+  );
+}
+
+// What Onairos actually read: how much of the data, and what each platform showed. A meter,
+// because it's about the data, not a measure of the person.
+function WhatItRead({ p, mine }: { p: OnairosNormalized; mine: boolean }) {
+  const c = p.coverage;
+  const share = c.sampled != null && c.analyzed ? c.sampled / c.analyzed : c.label ? parseFloat(c.label) / 100 : null;
+  if (share == null && !p.sources?.length) return null;
+  return (
+    <figure className="mt-2 rounded-[28px] bg-paper p-5" style={{ boxShadow: "var(--lift-1)" }}>
+      <figcaption className="t-meta text-ink-3">What Onairos read</figcaption>
+      {share != null && (
+        <>
+          <p className="mt-1 t-body font-semibold text-ink">
+            {c.sampled != null && c.analyzed != null ? `${c.sampled.toLocaleString("en")} of ${mine ? "your" : "their"} ${c.analyzed.toLocaleString("en")} items` : `${Math.round(share * 100)}% of ${mine ? "your" : "their"} data`}
+          </p>
+          <div className="mt-3 h-3 w-full rounded-[6px] bg-fill" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(share * 100)} aria-label="How much Onairos read">
+            <div className="h-full rounded-[6px]" style={{ width: `${Math.max(4, Math.min(100, share * 100))}%`, ...PAINT }} />
+          </div>
+          <p className="mt-2 t-meta text-ink-3">{c.label ?? `${Math.round(share * 100)}%`} coverage · a read from a sample, so it can be wrong</p>
+        </>
+      )}
+      {!!p.sources?.length && (
+        <ul className="mt-4 flex flex-col">
+          {p.sources.map((x, i) => (
+            <li key={x.platform} className={`flex gap-3 py-3 ${i ? "border-t border-[var(--fill)]" : ""}`}>
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-fill t-label font-semibold text-ink-2" aria-hidden>
+                {x.platform[0]}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block t-label font-medium text-ink">{x.platform}</span>
+                <span className="block t-label text-ink-2">{x.summary}</span>
+              </span>
+            </li>
           ))}
-        </tbody>
-      </table>
+        </ul>
+      )}
     </figure>
   );
 }
@@ -110,7 +114,8 @@ export default function Traits({ p, who, children }: { p: OnairosNormalized; who
         </div>
       </div>
 
-      {top.length > 0 && <StrengthsChart top={top} mine={mine} p={p} />}
+      {top.length > 0 && <Strengths top={top} mine={mine} p={p} />}
+      <WhatItRead p={p} mine={mine} />
 
       {children}
     </section>

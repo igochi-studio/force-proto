@@ -1,35 +1,36 @@
 {
-  "_fixture": "Sample General persona in evidence mode, shaped like docs.onairos.io/persona-data-model. Used when the real Onairos request is delayed or unavailable; the UI labels it as sample data.",
+  "_fixture": "Onairos's own example output for the General schema (standard mode: trait name -> number), shared by the team on 31 Oct 2026. The summary and explanation were cut short in the example and are completed here. Used until the real Onairos request is wired in; the UI labels it as sample data.",
   "DataAnalysis": {
     "personality_traits": {
       "positive_traits": {
-        "Curiosity": { "score": 86, "emoji": "🔭", "evidence": "You keep asking how things work underneath, not just what they do." },
-        "Empathy": { "score": 81, "emoji": "🤝", "evidence": "You save and share stories about the people behind a problem." },
-        "Persistence": { "score": 74, "emoji": "🧗", "evidence": "You return to the same hard topics over months instead of dropping them." },
-        "Design sense": { "score": 70, "emoji": "✏️", "evidence": "You follow interface and design work closely and comment on the details." }
+        "Creative Problem Solving": 92,
+        "Science and Technology Enthusiasm": 88,
+        "Community Engagement": 85,
+        "Visual Storytelling": 78
       },
       "traits_to_improve": {
-        "Delegation": { "score": 41, "emoji": "🪢", "evidence": "You tend to take on every part of a project yourself." }
+        "Structured Planning": 65,
+        "Financial Awareness": 54,
+        "Routine Consistency": 46
       },
-      "user_summary": "A curious maker who learns by talking to people and returns to hard problems until they make sense.",
-      "top_traits_explanation": "Curiosity and empathy show up together: you ask questions, and the questions are usually about people.",
-      "archetype": "Curious Builder",
+      "user_summary": "You are a curious, creative individual who learns by making things and sharing them with the communities you care about.",
+      "top_traits_explanation": "Your positive traits reflect a strong pattern of exploring new ideas, building with technology, and bringing other people along with you.",
+      "archetype": "Creative Explorer",
       "nudges": [
-        { "text": "Ask one person the question you've been sitting on this week." },
-        { "text": "Share an unfinished draft with someone whose work you admire." },
-        { "text": "Block one hour to write down what you'd do if the blocker disappeared." }
+        { "text": "You're highly analytical — try journaling a decision you're mulling over." },
+        { "text": "Consider dedicating time to purely enjoyable, less analytical activities — it can refresh your perspective." }
       ]
     }
   },
   "metadata": {
-    "total_items_analyzed": 1200,
-    "items_sampled": 240,
-    "chunks_processed": 12,
-    "total_chunks": 60,
-    "coverage": "20%",
+    "total_items_analyzed": 847,
+    "items_sampled": 420,
+    "chunks_processed": 4,
+    "total_chunks": 6,
+    "coverage": "66.7%",
     "platform_breakdown": {
-      "YouTube": { "summary": "Design talks, documentaries, maker videos." },
-      "ChatGPT": { "summary": "Questions about research methods and writing." }
+      "reddit": { "summary": "Strong community, technology, and learning interests." },
+      "youtube": { "summary": "Creative tutorials, music discovery, and long-form explainers." }
     }
   }
 }
