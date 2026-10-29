@@ -237,27 +237,28 @@ function People() {
           <h2 className="t-body text-ink-3">People here</h2>
           {inGraph && <span className="t-meta text-ink-3">{linking ? "Force is reading everyone next to you…" : mine.length ? `${mine.length} worth meeting first` : "No clear match yet"}</span>}
         </div>
-        <ul className="grid grid-cols-2 gap-3">
+        <ul className="flex flex-col gap-2">
           {people.map((p) => {
             const c = connOf(p.id);
             return (
-              <li key={p.id} className="flex flex-col rounded-[24px] bg-paper p-3 pt-5" style={{ boxShadow: "var(--lift-1)" }}>
-                <button type="button" onClick={() => (haptic(), f.push({ name: "connection", id: p.id }))} className="press flex flex-1 flex-col items-center text-center" aria-label={`${p.name}${c ? `, ${CONNECTION_LABEL[c.type]}` : ""}`}>
-                  <span className="relative">
-                    <Face face={p.face} size={64} />
-                    {c && (
-                      <span className="absolute -bottom-2 left-1/2 -translate-x-1/2">
-                        <Badge c={c} />
-                      </span>
-                    )}
+              <li key={p.id} className="rounded-[28px] bg-paper p-4" style={{ boxShadow: "var(--lift-1)" }}>
+                <button type="button" onClick={() => (haptic(), f.push({ name: "connection", id: p.id }))} className="press flex w-full items-center gap-3 text-left" aria-label={`${p.name}${c ? `, ${CONNECTION_LABEL[c.type]}` : ""}`}>
+                  <Face face={p.face} size={48} />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="t-body font-semibold text-ink">{p.name}</span>
+                      {c && <Badge c={c} flat />}
+                    </span>
+                    <span className="mt-[2px] block truncate t-label text-ink-3">{p.work}</span>
                   </span>
-                  <span className="mt-4 t-body font-semibold text-ink">{p.name}</span>
-                  <span className="mt-[2px] line-clamp-2 t-meta text-ink-3">{p.work}</span>
-                  {c && <span className="mt-2 line-clamp-4 t-label text-ink-2">{c.why_connected}</span>}
+                  <I.Chevron size={16} className="shrink-0 text-ink-4" />
                 </button>
-                <button type="button" onClick={() => (haptic(), f.push({ name: "connection", id: p.id, say: true }))} className="press mt-3 h-9 w-full rounded-full bg-fill t-label font-medium text-ink">
-                  Say hi
-                </button>
+                {c && <p className="mt-3 t-body text-ink-2">{c.why_connected}</p>}
+                {c && (
+                  <button type="button" onClick={() => (haptic(), f.push({ name: "connection", id: p.id, say: true }))} className="press mt-3 h-10 rounded-full bg-fill px-4 t-label font-medium text-ink">
+                    Say hi
+                  </button>
+                )}
               </li>
             );
           })}

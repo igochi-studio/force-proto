@@ -19,12 +19,13 @@ import Nav from "../f/Nav";
 import Grow from "./Grow";
 import { Band } from "./Painted";
 import Glass from "../f/Glass";
-import { I, Logo, SPRING, haptic } from "../f/ui";
+import { Logo, SPRING, haptic } from "../f/ui";
 
-export function Badge({ c }: { c: Connection }) {
+// flat: inside a white card (grey, no lift), never white on white.
+export function Badge({ c, flat = false }: { c: Connection; flat?: boolean }) {
   const b = CONNECTION_BADGE[c.type];
   return (
-    <span className="inline-flex items-center gap-[6px] whitespace-nowrap rounded-full bg-paper px-2 py-[2px] t-meta font-medium text-ink" style={{ boxShadow: "var(--lift-1)" }}>
+    <span className={`inline-flex items-center gap-[6px] whitespace-nowrap rounded-full px-2 py-[2px] t-meta font-medium text-ink ${flat ? "bg-fill" : "bg-paper"}`} style={flat ? undefined : { boxShadow: "var(--lift-1)" }}>
       <span className="h-[7px] w-[7px] rounded-full" style={{ background: `var(--${b.hue}-4)` }} aria-hidden />
       {b.label}
     </span>
@@ -39,6 +40,7 @@ export default function ConnectionPage({ id, say = false }: { id: string; say?: 
   const snapshot = useR((s) => s.snapshot);
   const { graph } = useCohort();
   const [writing, setWriting] = useState(say);
+  const [editing, setEditing] = useState(false);
   const p = residentById(id);
   const theirs = COHORT.find((s) => s.resident_id === id);
   const pid = `person_${id}`;
@@ -69,15 +71,11 @@ export default function ConnectionPage({ id, say = false }: { id: string; say?: 
       <Nav title={p.name} />
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-[72px]">
         <div className="px-1">
-          <span className="relative inline-block">
-            <Face face={p.face} size={88} />
-            {conn && (
-              <span className="absolute -bottom-2 left-1/2 -translate-x-1/2">
-                <Badge c={conn} />
-              </span>
-            )}
-          </span>
-          <h1 className="mt-5 t-large text-ink">{p.name}</h1>
+          <Face face={p.face} size={80} />
+          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 className="t-large text-ink">{p.name}</h1>
+            {conn && <Badge c={conn} />}
+          </div>
           <p className="mt-1 t-body text-ink-3">{p.work}</p>
           {!!theirs?.approach.length && (
             <div className="mt-3 flex flex-wrap gap-[6px]">
@@ -145,17 +143,28 @@ export default function ConnectionPage({ id, say = false }: { id: string; say?: 
         )}
       </div>
 
-      <div className="shrink-0 px-4 pb-3 pt-2">
+      <div className="relative shrink-0 px-4 pb-3 pt-2">
+        {/* A soft edge so the page reads as running under the draft, not cut by it */}
+        <span className="pointer-events-none absolute inset-x-0 -top-6 h-6" style={{ background: "linear-gradient(to top, var(--canvas), transparent)" }} aria-hidden />
         <AnimatePresence initial={false} mode="popLayout">
           {writing ? (
-            <motion.div key="write" className="rounded-[26px] bg-paper p-3" style={{ boxShadow: "var(--lift-2)" }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.1 } }} transition={SPRING.ui}>
-              <p className="flex items-center gap-[6px] px-2 pt-1 t-meta text-ink-3">
-                <Logo size={12} /> Force drafted this from both snapshots. Make it yours.
+            <motion.div key="write" className="rounded-[26px] bg-paper p-4" style={{ boxShadow: "var(--lift-2)" }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.1 } }} transition={SPRING.ui}>
+              <p className="flex items-center gap-[6px] t-meta text-ink-3">
+                <Logo size={12} /> Force drafted this from both snapshots
               </p>
-              <div className="flex items-end gap-2 pl-2">
-                <Grow value={text} onChange={setText} onSend={send} autoFocus aria-label={`Message to ${p.name}`} max={7} />
-                <button type="button" aria-label="Send" onClick={send} disabled={!text.trim()} className="press mb-[2px] grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ink text-paper disabled:opacity-20">
-                  <I.Up size={18} />
+              {editing ? (
+                <div className="-mx-1 mt-1 rounded-[18px] bg-fill px-3">
+                  <Grow value={text} onChange={setText} onSend={() => setEditing(false)} autoFocus aria-label={`Message to ${p.name}`} max={5} />
+                </div>
+              ) : (
+                <p className="mt-2 line-clamp-4 t-body text-ink">{text}</p>
+              )}
+              <div className="mt-3 flex items-center justify-end gap-2">
+                <button type="button" onClick={() => (haptic(), setEditing(!editing))} className="press h-10 rounded-full bg-fill px-4 t-label font-medium text-ink">
+                  {editing ? "Done" : "Edit"}
+                </button>
+                <button type="button" onClick={send} disabled={!text.trim()} className="press h-10 rounded-full bg-ink px-5 t-label font-medium text-paper disabled:opacity-20">
+                  Send
                 </button>
               </div>
             </motion.div>
