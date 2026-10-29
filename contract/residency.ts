@@ -317,7 +317,7 @@ export const CONNECTION_BADGE: Record<ConnectionType, { label: string; hue: "ros
   shared_problem: { label: "Same problem", hue: "rose" },
   complementary_approach: { label: "Complements you", hue: "sage" },
   shared_exploration: { label: "Same question", hue: "sky" },
-  potential_contribution: { label: "Can help", hue: "amber" },
+  potential_contribution: { label: "Can help you", hue: "amber" },
 };
 
 export const CONNECTION_LABEL: Record<ConnectionType, string> = {

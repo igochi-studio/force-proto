@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Copy, HandHelping, MessageCircleQuestionMark, Puzzle, Target } from "lucide-react";
+import { Copy } from "lucide-react";
 import { CONNECTION_BADGE, CONNECTION_LABEL, FIELD_LABEL, isConnection, type Connection, type Evidence, type Snapshot } from "@/contract/residency";
 import { residentById } from "@/data/residency";
 import { f } from "@/lib/f/store";
@@ -22,16 +22,10 @@ import { Band } from "./Painted";
 import Glass from "../f/Glass";
 import { Logo, SPRING, haptic } from "../f/ui";
 
-// How you're connected, the iOS way: a symbol and a word in secondary text, no pills.
-const KIND_ICON = { shared_problem: Target, complementary_approach: Puzzle, shared_exploration: MessageCircleQuestionMark, potential_contribution: HandHelping } as const;
+// How you're connected, the iOS way: a plain word in secondary text. No pills, no icons
+// (they turn to smudges at this size).
 export function Kind({ c, className = "" }: { c: Connection; className?: string }) {
-  const Ic = KIND_ICON[c.type];
-  return (
-    <span className={`flex items-center gap-1 t-label text-ink-2 ${className}`}>
-      <Ic size={14} strokeWidth={1.75} absoluteStrokeWidth className="shrink-0 text-ink-3" aria-hidden />
-      {CONNECTION_BADGE[c.type].label}
-    </span>
-  );
+  return <span className={`block t-label text-ink-2 ${className}`}>{CONNECTION_BADGE[c.type].label}</span>;
 }
 
 // A first hello when Force has no drafted one: plain, specific, small.
