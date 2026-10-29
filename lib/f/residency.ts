@@ -24,6 +24,7 @@ interface R {
   snapshot: Snapshot | null;
   synth: "idle" | "busy" | "failed";
   lookup: boolean; // you said yes to Force reading what's public about you
+  sharePersona: boolean; // show how you come across (Onairos) to the residency, a separate yes
   footprint: { status: "idle" | "busy" | "done" | "failed"; findings: Finding[]; read: string[] };
   dropped: string[]; // findings you said weren't you
   mine: Connection[]; // your connections, once you've approved and shared
@@ -35,7 +36,7 @@ interface R {
 
 const KEY = "force.residency.v2";
 const id = () => `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-const fresh = (): R => ({ done: false, me: id(), name: "", links: {}, extra: [], onairos: "off", persona: null, answers: [], contribution: { can_offer: [], seeking: [] }, snapshot: null, synth: "idle", lookup: false, footprint: { status: "idle", findings: [], read: [] }, dropped: [], mine: [], linking: false, clips: [], tab: "people", tip: false });
+const fresh = (): R => ({ done: false, me: id(), name: "", links: {}, extra: [], onairos: "off", persona: null, answers: [], contribution: { can_offer: [], seeking: [] }, snapshot: null, synth: "idle", lookup: false, sharePersona: false, footprint: { status: "idle", findings: [], read: [] }, dropped: [], mine: [], linking: false, clips: [], tab: "people", tip: false });
 
 // Decided before anything renders, so there's never a flash of the wrong step.
 const load = (): R => {
@@ -105,6 +106,12 @@ const link = async () => {
 
 // Every change to the snapshot goes through here. Changing what you approved means approving
 // it again before the cohort sees the new version.
+// What others may see of your Onairos read: never traits_to_improve or its nudges.
+const publicPersona = () => {
+  const s = get();
+  return s.sharePersona && s.persona ? { ...s.persona, private_growth: [], nudges: [] } : undefined;
+};
+
 const patch = (fn: (s: Snapshot) => Snapshot) => {
   const s = get().snapshot;
   if (!s) return;
@@ -182,13 +189,13 @@ export const r = {
     const s = get().snapshot;
     if (!s) return;
     if (s.status !== "approved") return set({ snapshot: { ...s, shared } });
-    set({ snapshot: await api.approve(s, shared) });
+    set({ snapshot: await api.approve({ ...s, persona: publicPersona() }, shared) });
     await link();
   },
   async approve() {
     const s = get().snapshot;
     if (!s) return;
-    set({ snapshot: await api.approve(s, s.shared) });
+    set({ snapshot: await api.approve({ ...s, persona: publicPersona() }, s.shared) });
     void link();
   },
   relink: link,
@@ -200,6 +207,12 @@ export const r = {
   },
   setTab(tab: R["tab"]) {
     set({ tab });
+  },
+  async setSharePersona(v: boolean) {
+    set({ sharePersona: v });
+    const s = get().snapshot;
+    if (s?.status === "approved") set({ snapshot: await api.approve({ ...s, persona: publicPersona() }, s.shared) });
+    else if (s) set({ snapshot: { ...s, persona: publicPersona() } });
   },
   setLookup(v: boolean) {
     set({ lookup: v });

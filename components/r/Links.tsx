@@ -140,10 +140,10 @@ export function LookupCard({ className = "" }: { className?: string }) {
 }
 
 // Before anything connects: what's read, what Force takes from it, what it keeps, and why.
-export function OnairosCard({ className = "" }: { className?: string }) {
+export function OnairosCard({ className = "", id = "onairos" }: { className?: string; id?: string }) {
   const onairos = useR((s) => s.onairos);
   return (
-    <div id="onairos" className={`rounded-[28px] bg-paper p-5 ${className}`} style={{ boxShadow: "var(--lift-1)" }}>
+    <div id={id} className={`rounded-[28px] bg-paper p-5 ${className}`} style={{ boxShadow: "var(--lift-1)" }}>
       <div className="flex items-center gap-4">
         <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full" style={{ background: "linear-gradient(160deg, #fff4ee, #eef3fe)" }}>
           <OnairosMark size={40} />

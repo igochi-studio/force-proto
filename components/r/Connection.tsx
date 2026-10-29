@@ -18,6 +18,7 @@ import { useCohort } from "@/lib/r/cohort";
 import Face from "../f/Face";
 import Nav, { BlurBottom } from "../f/Nav";
 import Grow from "./Grow";
+import Traits from "./Traits";
 import { Band } from "./Painted";
 import Glass from "../f/Glass";
 import { Logo, SPRING, haptic } from "../f/ui";
@@ -133,6 +134,8 @@ export default function ConnectionPage({ id, say = false }: { id: string; say?: 
             </ul>
           </section>
         )}
+
+        {theirs?.persona && <Traits p={theirs.persona} who={p.name} />}
 
         {conn && (evTheirs || evYours) && (
           <section className="mt-8">

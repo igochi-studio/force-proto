@@ -62,6 +62,9 @@ export interface Snapshot {
   noticed?: Noticed[]; // what Force read between the lines; private to the resident, never in the graph
   takes?: { intent?: string; problem?: string; current_frontier?: string; approach?: Record<string, string> }; // Force's own take on each part, private
   source?: "model" | "draft"; // written by the model, or the plain draft from the answers
+  // How they come across (Onairos), only when they chose to show it to the residency. Never
+  // the private parts: traits_to_improve and nudges are stripped before it's shared.
+  persona?: OnairosNormalized;
 }
 
 // One thing Force noticed by putting the sources together, with where each part came from.

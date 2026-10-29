@@ -157,6 +157,18 @@ for (const run of runs) {
     await tap(page.getByRole("button", { name: "Save" }));
     await page.getByText("Ship a memory prototype that five teams use daily.").waitFor({ timeout: 2000 });
   });
+  await step("how you come across, with the suggested action inside it", async () => {
+    await page.getByText("How you come across").first().waitFor({ timeout: 3000 });
+    await page.getByText(/shows up most/).first().waitFor({ timeout: 2000 });
+    if (await page.getByText("At a glance").count()) throw new Error("At a glance should be gone");
+  });
+  await step("settings holds the sources, not the page", async () => {
+    if (await page.locator("#link-github").count()) throw new Error("links are still on the snapshot page");
+    await tap(page.getByRole("button", { name: "Settings" }));
+    await page.locator("#link-github").waitFor({ timeout: 3000 });
+    await tap(page.getByRole("button", { name: "Back", exact: true }).last());
+    await page.locator("#link-github").waitFor({ state: "detached", timeout: 3000 });
+  });
   await step("one next step, with why (or a prompt to choose one)", () => page.getByText("Why this may help:").or(page.getByLabel("Your next step")).first().waitFor({ timeout: 2000 }));
   await step("what Force noticed", () => page.getByText("What Force noticed").first().waitFor({ timeout: 2000 }));
   if (run.name === "webkit-iphone") await step("what Force found about you, with sources", () => page.getByText("What Force found about you").waitFor({ timeout: 3000 }));
@@ -181,6 +193,7 @@ for (const run of runs) {
     await page.waitForFunction(() => !document.body.innerText.includes("Force is reading everyone"), null, { timeout: 60000 });
     await tap(page.getByRole("button", { name: /, (Shared problem|Complementary approach|Shared exploration|Potential contribution)$/ }).first());
     await page.getByText("Something to explore together").waitFor({ timeout: 3000 });
+    await page.getByText(/How .+ comes across/).first().waitFor({ timeout: 3000 });
     await page.getByText("Suggested by Force, not yet reviewed").waitFor({ timeout: 2000 });
   });
   await shot("9-connection");

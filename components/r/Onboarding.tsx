@@ -118,9 +118,9 @@ function Connect({ onNext }: { onNext: () => void }) {
         </header>
 
         <NameField />
-        <LookupCard className="mt-6" />
-        <LinkList className="mt-2" />
         <OnairosCard className="mt-6" />
+        <LookupCard className="mt-2" />
+        <LinkList className="mt-2" />
       </div>
       <div className="relative shrink-0 px-4 pb-3 pt-2">
         <BlurBottom />

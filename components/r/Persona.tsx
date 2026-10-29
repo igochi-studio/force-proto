@@ -11,7 +11,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, useTransform } from "motion/react";
-import { CONNECTION_LABEL, FIELDS, QUESTIONS, visible, FIELD_LABEL, FIELD_MEANING, OFFER_TAGS, SEEK_TAGS, isEmpty, type Field, type Snapshot } from "@/contract/residency";
+import { Settings2 } from "lucide-react";
+import { CONNECTION_LABEL, FIELDS, QUESTIONS, FIELD_LABEL, FIELD_MEANING, OFFER_TAGS, SEEK_TAGS, isEmpty, type Field, type Snapshot } from "@/contract/residency";
 import { residentById, youWorld, type NodeKind } from "@/data/residency";
 import { f } from "@/lib/f/store";
 import { r, useR } from "@/lib/f/residency";
@@ -19,9 +20,7 @@ import { otherIn, useCohort } from "@/lib/r/cohort";
 import Nav, { BlurBottom } from "../f/Nav";
 import MapFrame from "./MapFrame";
 import { Band, FIELD_ART, ForceMark, InsightDeck, cropOf } from "./Painted";
-import { LensBars, WordsBar } from "./Charts";
 import Traits from "./Traits";
-import { COHORT } from "@/lib/r/api";
 import Glass from "../f/Glass";
 import { LinkList, LookupCard, NameField, OnairosCard } from "./Links";
 import { AudioBubble } from "../f/Bubbles";
@@ -460,26 +459,6 @@ function Found() {
   );
 }
 
-// ── At a glance: the analysis as pictures, from counts only ──
-function AtAGlance({ s }: { s: Snapshot }) {
-  const answers = useR((x) => x.answers);
-  const others = COHORT.filter((x) => visible(x) && x.resident_id !== s.resident_id);
-  const rows = s.approach.map((a) => {
-    const who = others.filter((o) => o.approach.some((b) => b.toLowerCase() === a.toLowerCase())).map((o) => o.name);
-    return { name: a, n: who.length, who };
-  });
-  if (!answers.some((a) => a.trim()) && !rows.length) return null;
-  return (
-    <section className="mt-8">
-      <H>At a glance</H>
-      <div className="flex flex-col gap-2">
-        <WordsBar answers={answers} />
-        <LensBars rows={rows} of={others.length} />
-      </div>
-    </section>
-  );
-}
-
 // ── Your answers, to hear again ──
 function Answers() {
   const { answers, clips } = useR();
@@ -507,6 +486,45 @@ function Answers() {
   );
 }
 
+// ── Settings ──
+// Everything that isn't the snapshot itself: your name, being looked up, your links,
+// Onairos, starting over. Pushed over your page the iOS way.
+function SettingsPage({ onClose }: { onClose: () => void }) {
+  const onairos = useR((x) => x.onairos);
+  return (
+    <motion.div className="absolute inset-0 z-[5] flex flex-col bg-canvas" initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%", transition: { type: "spring", duration: 0.28, bounce: 0 } }} transition={{ type: "spring", duration: 0.36, bounce: 0 }} style={{ boxShadow: "var(--lift-2)" }}>
+      <Nav title="Settings" onBack={onClose} />
+      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-[64px]">
+        <section className="mt-2">
+          <H>Your name</H>
+          <NameField />
+        </section>
+        <section className="mt-8">
+          <H hint="What Force reads to understand you better. Change it any time.">Sources</H>
+          <OnairosCard />
+          <LookupCard className="mt-2" />
+        </section>
+        <section className="mt-8">
+          <H hint="Optional. Force reads these only if you let it look you up.">Where people can find you</H>
+          <LinkList />
+        </section>
+        <button
+          type="button"
+          onClick={() => {
+            if (!window.confirm("Start over? Your answers and snapshot on this phone will be cleared.")) return;
+            f.home();
+            r.startOver();
+          }}
+          className="press mt-8 flex h-11 w-full items-center justify-center t-label text-ink-3"
+        >
+          Start over
+        </button>
+        {onairos === "on" && <p className="px-1 text-center t-meta text-ink-3">Onairos is connected.</p>}
+      </div>
+    </motion.div>
+  );
+}
+
 // iOS switch, the same as on your profile.
 function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
@@ -528,9 +546,10 @@ function H({ children, hint }: { children: React.ReactNode; hint?: string }) {
 // Your page: the same from the snapshot in the conversation and from your face on home.
 // onContinue: on the way in, approving takes you on to the residency.
 export default function Persona({ onBack, onContinue }: { onBack?: () => void; onContinue?: () => void }) {
-  const { name, snapshot: s, persona, onairos, tip, contribution } = useR();
+  const { name, snapshot: s, persona, onairos, tip, contribution, sharePersona } = useR();
   const { mine } = useCohort();
   const first = name.trim().split(/\s+/)[0];
+  const [settings, setSettings] = useState(false);
 
   if (!s)
     return (
@@ -552,7 +571,16 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
 
   return (
     <div className="relative flex h-full flex-col">
-      <Nav title={first || "You"} onBack={onBack} />
+      <Nav
+        title={first || "You"}
+        onBack={onBack}
+        right={
+          <button type="button" aria-label="Settings" onClick={() => (haptic(), setSettings(true))} className="press pill hit h-11 w-11 justify-center p-0">
+            <Settings2 size={19} strokeWidth={1.75} absoluteStrokeWidth />
+          </button>
+        }
+      />
+      <AnimatePresence>{settings && <SettingsPage key="settings" onClose={() => setSettings(false)} />}</AnimatePresence>
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-[64px]">
         <YouMap />
 
@@ -572,19 +600,23 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
         )}
 
         {persona ? (
-          <Traits p={persona} nudged={s.next_step?.source === "onairos_nudge"} step={s.next_step && s.next_step.status !== "dismissed" ? { text: s.next_step.text, why: s.next_step.why_it_may_help } : null} />
+          <Traits p={persona}>
+            <div id="next-step" className="mt-6 scroll-mt-20">
+              <H hint="Swipe right to accept, left to dismiss, tap to change it.">{s.next_step?.source === "onairos_nudge" ? "Suggested action · from Onairos" : "Suggested action"}</H>
+              <NextStep s={s} />
+            </div>
+          </Traits>
         ) : (
-          <button type="button" onClick={() => (haptic(), document.getElementById("onairos")?.scrollIntoView({ behavior: "smooth", block: "center" }))} className="press mt-8 flex w-full items-center gap-3 rounded-[24px] bg-fill px-4 py-3 text-left">
-            <Glass size={32} art="dusk" x={40} y={55} zoom={300} />
-            <span className="min-w-0 flex-1">
-              <span className="block t-body font-medium text-ink">How you come across</span>
-              <span className="block t-label text-ink-3">Connect Onairos to see your archetype and strengths.</span>
-            </span>
-            <I.Chevron size={16} className="shrink-0 text-ink-4" />
-          </button>
+          // Not connected yet: the section is still here, with Onairos itself to connect in
+          // place. It fills in the moment it's connected.
+          <section className="mt-8">
+            <h3 className="mb-1 flex items-center gap-2 px-1 t-body font-medium text-ink">
+              <Glass size={26} art="dusk" x={40} y={55} zoom={300} /> How you come across
+            </h3>
+            <p className="mb-3 px-1 t-label text-ink-3">Your archetype, strengths, a short summary and why, from the apps you connect to Onairos. Only you see it.</p>
+            <OnairosCard id="onairos-here" />
+          </section>
         )}
-
-        <AtAGlance s={s} />
 
         <Found />
 
@@ -598,10 +630,12 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
           </div>
         </section>
 
+{!persona && (
         <section id="next-step" className="mt-8 scroll-mt-20">
           <H hint="Swipe right to accept, left to dismiss, tap to change it.">A useful next step</H>
           <NextStep s={s} />
         </section>
+        )}
 
         <Answers />
 
@@ -611,10 +645,19 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
             <div className="flex items-center gap-3">
               <span className="min-w-0 flex-1">
                 <span className="block t-body font-medium text-ink">Share with the residency</span>
-                <span className="mt-1 block t-label text-ink-3">Your name and these five parts join the cohort graph, so Force can suggest people. Never your recordings, links or Onairos details.</span>
+                <span className="mt-1 block t-label text-ink-3">Your name and these five parts join the cohort graph, so Force can suggest people. Never your recordings or links.</span>
               </span>
               <Toggle on={s.shared} onChange={(v) => r.setShared(v)} label="Share with the residency" />
             </div>
+            {persona && s.shared && (
+              <div className="mt-4 flex items-center gap-3 border-t border-[var(--fill)] pt-4">
+                <span className="min-w-0 flex-1">
+                  <span className="block t-body font-medium text-ink">Show how you come across</span>
+                  <span className="mt-1 block t-label text-ink-3">Your archetype, summary and strengths on your page for residents. Never what Onairos says you could improve.</span>
+                </span>
+                <Toggle on={sharePersona} onChange={(v) => r.setSharePersona(v)} label="Show how you come across" />
+              </div>
+            )}
             <p className="mt-4 flex items-center gap-[6px] t-label" style={{ color: approved ? "var(--sage-7)" : undefined }}>
               <span className="h-[6px] w-[6px] shrink-0 rounded-full" style={{ background: approved ? "var(--sage-4)" : "var(--grey-300)" }} aria-hidden />
               <span className={approved ? "" : "text-ink-3"}>{status}</span>
@@ -640,25 +683,6 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
           )}
         </section>
 
-        <section className="mt-8">
-          <H hint="Optional. Force reads these only if you let it look you up.">Where people can find you</H>
-          <NameField />
-          <LookupCard className="mt-2" />
-          <LinkList className="mt-2" />
-          <OnairosCard className="mt-2" />
-        </section>
-
-        <button
-          type="button"
-          onClick={() => {
-            if (!window.confirm("Start over? Your answers and snapshot on this phone will be cleared.")) return;
-            f.home();
-            r.startOver();
-          }}
-          className="press mt-8 flex h-11 w-full items-center justify-center t-label text-ink-3"
-        >
-          Start over
-        </button>
       </div>
       {(!approved || onContinue) && (
         <div className="relative shrink-0 px-4 pb-3 pt-2">
