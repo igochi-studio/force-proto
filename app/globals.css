@@ -201,14 +201,16 @@ button:disabled {
 }
 
 /* A row that scrolls sideways without cutting off its children's shadows: room above and
-   below for the softest lift, given back with a negative margin. */
+   below for the softest lift, given back with a negative margin. Only the vertical margin is
+   set here, so a row with -mx-4 still runs out to the screen edges (this rule sits outside
+   Tailwind's layers and would otherwise beat it, clipping cards 16px short of the edge). */
 .scroll-row {
   display: flex;
   gap: 8px;
   overflow-x: auto;
   scrollbar-width: none;
   padding: 28px 16px 36px;
-  margin: -28px 0 -36px;
+  margin-block: -28px -36px;
 }
 .scroll-row::-webkit-scrollbar {
   display: none;

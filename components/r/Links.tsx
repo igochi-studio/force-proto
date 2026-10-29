@@ -17,12 +17,12 @@ export function NameField({ className = "" }: { className?: string }) {
   const name = useR((s) => s.name);
   return (
     <label className={`flex h-[60px] items-center rounded-full bg-paper px-5 ${className}`} style={{ boxShadow: "var(--lift-1)" }}>
-      <input value={name} onChange={(e) => r.setName(e.target.value)} autoComplete="name" placeholder="Your name" aria-label="Your name" enterKeyHint="next" className="min-w-0 flex-1 bg-transparent t-body text-ink outline-none placeholder:text-ink-3" />
+      <input value={name} onChange={(e) => r.setName(e.target.value)} autoComplete="name" placeholder="Your name" aria-label="Your name" enterKeyHint="done" onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), e.currentTarget.blur())} className="min-w-0 flex-1 bg-transparent t-body text-ink outline-none placeholder:text-ink-3" />
     </label>
   );
 }
 
-function LinkRow({ id, kind, name, art, x, y, value, onChange }: { id: string; kind: LinkKind | "extra"; name: string; art: Art; x: number; y: number; value: string; onChange: (v: string) => void }) {
+function LinkRow({ id, kind, name, art, x, y, value, onChange, onEnter, last }: { id: string; kind: LinkKind | "extra"; name: string; art: Art; x: number; y: number; value: string; onChange: (v: string) => void; onEnter: () => void; last: boolean }) {
   const [focus, setFocus] = useState(false);
   const on = !!value.trim();
   const M = MARKS[kind];
@@ -46,7 +46,13 @@ function LinkRow({ id, kind, name, art, x, y, value, onChange }: { id: string; k
         autoCorrect="off"
         spellCheck={false}
         inputMode="url"
-        enterKeyHint="next"
+        enterKeyHint={last ? "done" : "next"}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter") return;
+          e.preventDefault();
+          if (last) e.currentTarget.blur();
+          else onEnter();
+        }}
         className="min-w-0 flex-1 bg-transparent t-body text-ink outline-none placeholder:text-ink-3"
       />
       <AnimatePresence initial={false} mode="popLayout">
@@ -89,14 +95,17 @@ export function LinkList({ className = "" }: { className?: string }) {
     el?.focus();
     el?.scrollIntoView({ block: "center", behavior: "smooth" });
   };
+  // Return moves down the list, the way the keyboard's arrows do; the last one closes it.
+  const order = [...LINKS.map((l) => l.kind as string), ...extra.map((_, i) => `x${i}`)];
+  const after = (k: string) => () => focusLink(order[order.indexOf(k) + 1]);
   return (
     <div className={className}>
       <div className="flex flex-col gap-2">
         {LINKS.map((l) => (
-          <LinkRow key={l.kind} id={`link-${l.kind}`} {...l} value={links[l.kind] ?? ""} onChange={(v) => r.setLink(l.kind, v)} />
+          <LinkRow key={l.kind} id={`link-${l.kind}`} {...l} value={links[l.kind] ?? ""} onChange={(v) => r.setLink(l.kind, v)} onEnter={after(l.kind)} last={order.at(-1) === l.kind} />
         ))}
         {extra.map((x, i) => (
-          <LinkRow key={`x${i}`} id={`link-x${i}`} kind="extra" name="Any other link" art="meadow" x={20 + i * 25} y={70} value={x} onChange={(v) => r.setExtra(i, v)} />
+          <LinkRow key={`x${i}`} id={`link-x${i}`} kind="extra" name="Any other link" art="meadow" x={20 + i * 25} y={70} value={x} onChange={(v) => r.setExtra(i, v)} onEnter={after(`x${i}`)} last={i === extra.length - 1} />
         ))}
       </div>
       <button type="button" onClick={() => (haptic(), r.addExtra(), setTimeout(() => focusLink(`x${extra.length}`), 50))} className="press mt-2 flex h-11 items-center gap-2 px-3 t-label font-medium text-ink-2">
