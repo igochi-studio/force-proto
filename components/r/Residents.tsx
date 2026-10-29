@@ -1,30 +1,31 @@
 "use client";
 
 // Home, for the residency, in the order you meet it: you (your face, top left, opens your
-// pattern map), then two tabs:
-//   People: the energy map. You low in the middle, everyone in the residency strung to you in
-//   their painting, the shorter the strand the nearer their patterns are to yours. Tap
-//   someone and their card grows out of them: what they're on, what you share, where else
-//   they are, and a way to talk.
+// snapshot), then two tabs:
+//   People: the cohort graph. Everyone who approved and shared their snapshot, what each of
+//   them wants to change, and the themes between them; tap any node to go deeper. Under it,
+//   your connections, each with its reason. Zero is an honest answer; nothing is added to
+//   make the map look fuller.
 //   Conversations: Force first, then everyone here, open threads on top.
-// Under both, the side quests Force suggests, as painted covers.
+// Under both, the side quests, as a preview of what comes after the residency.
 
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ART_SRC } from "@/data/mira";
-import { LINKS, ME_FACE, RESIDENTS, type Resident } from "@/data/residency";
+import { CONNECTION_LABEL, type Connection } from "@/contract/residency";
+import { ME_FACE, RESIDENTS, cohortWorld, residentById, type NodeKind } from "@/data/residency";
 import { f, useF } from "@/lib/f/store";
 import { r, useR } from "@/lib/f/residency";
 import Face from "../f/Face";
 import Glass from "../f/Glass";
-import Goo, { string, type Blob } from "../f/Goo";
-import { MARKS } from "../f/brands";
+import PatternWorld from "./PatternWorld";
+import { otherIn, useCohort } from "@/lib/r/cohort";
 import { I, Logo, SPRING, haptic } from "../f/ui";
 
 
-const thread = (id: string) => {
+const thread = (id: string, c?: Connection) => {
   haptic();
-  f.openThread(id);
+  f.openThread(id, c ? { why: c.why_connected, explore: c.what_to_explore } : undefined);
   f.push({ name: "dm", id });
 };
 
@@ -78,13 +79,16 @@ function Row({ onClick, icon, title, line, tag }: { onClick: () => void; icon: R
 
 function Conversations() {
   const dms = useF((s) => s.dms);
+  const me = useR((s) => s.me);
+  const { mine } = useCohort();
+  const conn = (id: string) => mine.find((c) => otherIn(c, me) === id);
   const last = (id: string) => {
     const m = dms[id];
     const x = m ? ([...m].reverse().find((y) => y.from !== "force") ?? m[m.length - 1]) : null;
     return x ? (x.from === "me" ? `You: ${x.text}` : x.text) : null;
   };
   // Threads you've opened first, then the ones nearest your patterns, then everyone.
-  const people = [...RESIDENTS].sort((a, b) => Number(!!dms[b.id]) - Number(!!dms[a.id]) || b.energy - a.energy);
+  const people = [...RESIDENTS].sort((a, b) => Number(!!dms[b.id]) - Number(!!dms[a.id]) || Number(!!conn(b.id)) - Number(!!conn(a.id)));
   return (
     <ul className="flex flex-col gap-2">
       <li>
@@ -101,130 +105,119 @@ function Conversations() {
       </li>
       {people.map((p) => (
         <li key={p.id}>
-          <Row onClick={() => thread(p.id)} icon={<Face face={p.face} size={44} />} title={p.name} line={last(p.id) ?? p.work} tag={p.pattern ? "Same pattern" : undefined} />
+          <Row onClick={() => thread(p.id, conn(p.id))} icon={<Face face={p.face} size={44} />} title={p.name} line={last(p.id) ?? p.work} tag={conn(p.id) ? CONNECTION_LABEL[conn(p.id)!.type] : undefined} />
         </li>
       ))}
     </ul>
   );
 }
 
-// ── People: the energy map ──
+// ── People: the cohort graph ──
 
-const H = 440;
-const ME_Y = 0.7;
+const KIND: Record<NodeKind, string> = { you: "You", person: "In the residency", intent: "Intent & problem", theme: "Theme & approach" };
 
 function People() {
-  const box = useRef<HTMLDivElement>(null);
-  const [w, setW] = useState(361);
+  const { graph, mine, failed } = useCohort();
+  const me = useR((s) => s.me);
+  const snapshot = useR((s) => s.snapshot);
+  const world = useMemo(() => cohortWorld(graph, me), [graph, me]);
   const [focus, setFocus] = useState<string | null>(null);
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setW(el.clientWidth));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  const { spots, blobs } = useMemo(() => {
-    const k = H / w;
-    const n = RESIDENTS.length;
-    const me: Blob = { x: 0.5, y: ME_Y, r: 0, art: ME_FACE.art };
-    const blobs: Blob[] = [];
-    const spots = RESIDENTS.map((p, i) => {
-      const slot = i % 2 === 0 ? i / 2 : n - 1 - (i - 1) / 2;
-      const a = -Math.PI + 0.3 + ((slot + 0.5) / n) * (Math.PI - 0.6);
-      const e = p.pattern ? p.energy : 0.35 + ((i * 7) % 5) * 0.05;
-      const d = 0.26 + (1 - e) * 0.56;
-      const x = Math.max(0.12, Math.min(0.88, 0.5 + Math.cos(a) * d * k));
-      const y = Math.max(0.12, ME_Y + Math.sin(a) * d);
-      const dim = (focus && focus !== p.id ? 0.3 : 1) * (0.55 + e * 0.45);
-      blobs.push(...string(me, { x, y, r: 0, art: p.face.art }, p.face.art, Math.round(10 + d * 30), 0.007 + e * 0.007).map((b) => ({ ...b, a: dim })));
-      return { p, x, y };
-    });
-    return { spots, blobs };
-  }, [w, focus]);
-  const picked = spots.find((s) => s.p.id === focus) ?? null;
+  const n = world.nodes.find((x) => x.id === focus) ?? null;
+  const near = n ? world.edges.flatMap(([a, b]) => (a === n.id ? [b] : b === n.id ? [a] : [])).map((id) => world.nodes.find((x) => x.id === id)!).filter(Boolean) : [];
+  const inGraph = world.nodes.some((x) => x.kind === "you");
+  const residents = world.nodes.filter((x) => x.kind === "person").length;
+  const res = n?.kind === "person" && n.person ? residentById(n.person) : null;
+  const connOf = (id: string) => mine.find((c) => otherIn(c, me) === id);
 
   return (
-    <div
-      ref={box}
-      className="relative overflow-hidden rounded-[28px] bg-paper"
-      style={{ height: H, boxShadow: "var(--lift-1)" }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget || (e.target as HTMLElement).tagName === "CANVAS") setFocus(null);
-      }}
-    >
-      <Goo blobs={blobs} w={w} h={H} className="absolute inset-0" />
-      <span className="pointer-events-none absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center" style={{ left: "50%", top: `${ME_Y * 100}%` }}>
-        <Glass size={60} {...ME_FACE} zoom={240} />
-        <span className="mt-1 t-meta text-ink-3">You</span>
-      </span>
-      {spots.map(({ p, x, y }) => {
-        const on = focus === p.id;
-        return (
-          <button
-            key={p.id}
-            type="button"
-            aria-label={p.name}
-            aria-pressed={on}
-            onClick={() => (haptic(), setFocus(on ? null : p.id))}
-            className="press absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center transition-opacity duration-300"
-            style={{ left: `${x * 100}%`, top: `${y * 100}%`, opacity: focus && !on ? 0.35 : 1 }}
-          >
-            <Face face={p.face} size={p.pattern ? 46 : 38} />
-            <span className={`mt-1 whitespace-nowrap rounded-full px-2 py-[2px] t-meta font-medium ${on ? "bg-ink text-paper" : "bg-paper text-ink"}`} style={on ? undefined : { boxShadow: "var(--lift-1)" }}>
-              {p.name}
-            </span>
-          </button>
-        );
-      })}
-      <AnimatePresence>
-        {picked ? (
-          <Card key={picked.p.id} p={picked.p} x={picked.x * w} y={picked.y * H} />
-        ) : (
-          <motion.span key="hint" className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-fill px-3 py-[6px] t-meta text-ink-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            Shorter strand, nearer pattern · tap someone
-          </motion.span>
+    <div>
+      <div className="relative h-[400px] overflow-hidden rounded-[28px] bg-paper" style={{ boxShadow: "var(--lift-1)" }}>
+        <PatternWorld nodes={world.nodes} edges={world.edges} focus={focus} onTap={setFocus} layout="cohort" />
+        {!n && <span className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-fill px-3 py-[6px] t-meta text-ink-3">Drag to turn · tap a node</span>}
+      </div>
+
+      <AnimatePresence initial={false} mode="popLayout">
+        {n && (
+          <motion.div key={n.id} className="mt-2 rounded-[24px] bg-paper p-4" style={{ boxShadow: "var(--lift-1)" }} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.12 } }} transition={SPRING.ui}>
+            <div className="flex items-start gap-3">
+              <span className="min-w-0 flex-1">
+                <span className="block t-meta text-ink-3">{KIND[n.kind]}</span>
+                <span className="mt-[2px] block t-body font-semibold text-ink">{res ? `${res.name} · ${res.work}` : n.label}</span>
+                {res && connOf(res.id) && <span className="mt-1 block t-label text-ink-2">{connOf(res.id)!.why_connected}</span>}
+                {!res && n.line && <span className="mt-1 block t-label text-ink-2">{n.line}</span>}
+              </span>
+              <button type="button" aria-label="Close" onClick={() => setFocus(null)} className="press hit grid h-8 w-8 shrink-0 place-items-center rounded-full bg-fill text-ink">
+                <I.Close size={14} />
+              </button>
+            </div>
+            {near.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-[6px]">
+                {near.map((l) => (
+                  <button key={l.id} type="button" onClick={() => (haptic(), setFocus(l.id))} className="press hit h-8 max-w-full truncate rounded-full bg-fill px-3 t-label text-ink">
+                    {l.title}
+                  </button>
+                ))}
+              </div>
+            )}
+            {res && (
+              <button type="button" onClick={() => (haptic(), f.push({ name: "connection", id: res.id }))} className="press pill-ink mt-3 h-11 w-full justify-center t-body font-medium">
+                {connOf(res.id) ? "Why you're connected" : `About ${res.name}`}
+              </button>
+            )}
+          </motion.div>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
 
-// Their card docks at the bottom of the map and grows out of the face you tapped.
-function Card({ p, x, y }: { p: Resident; x: number; y: number }) {
-  return (
-    <motion.div
-      className="absolute inset-x-3 bottom-3 rounded-[24px] bg-paper p-4"
-      style={{ boxShadow: "var(--lift-2)", transformOrigin: `${x - 12}px ${y - (H - 12)}px` }}
-      initial={{ opacity: 0, scale: 0.4 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.6, transition: { duration: 0.18 } }}
-      transition={SPRING.move}
-    >
-      <div className="flex items-start gap-3">
-        <span className="min-w-0 flex-1">
-          <span className="block t-body font-semibold text-ink">{p.name}</span>
-          <span className="block t-label text-ink-3">{p.work}</span>
-        </span>
-        <span className="flex shrink-0 gap-1">
-          {p.socials.map((k) => {
-            const l = LINKS.find((x) => x.kind === k)!;
-            const M = MARKS[k];
-            return (
-              <button key={k} type="button" aria-label={`${p.name} on ${l.name}`} onClick={() => f.toast(`Opens ${p.name}'s ${l.name}`)} className="press rounded-full">
-                <Glass size={30} art={l.art} x={l.x} y={l.y} zoom={320}>
-                  <M size={12} />
-                </Glass>
-              </button>
-            );
-          })}
-        </span>
-      </div>
-      {p.pattern && <p className="mt-3 rounded-[16px] bg-fill px-3 py-2 t-label text-ink">{p.pattern}</p>}
-      <button type="button" onClick={() => thread(p.id)} className="press pill-ink mt-3 h-11 w-full justify-center t-body font-medium">
-        Message {p.name}
-      </button>
-    </motion.div>
+      {failed && <p className="mt-3 rounded-[24px] bg-fill p-4 t-label text-ink-2">Couldn&apos;t load the latest graph. Showing what Force had; it tries again when your snapshot changes.</p>}
+
+      {!inGraph && (
+        <div className="mt-3 rounded-[28px] bg-paper p-5" style={{ boxShadow: "var(--lift-1)" }}>
+          <p className="t-body font-semibold text-ink">You&apos;re not in the graph yet</p>
+          <p className="mt-1 t-label text-ink-3">{snapshot?.status === "approved" ? "Your snapshot is approved but private. Share it with the residency to appear here and get connections." : "Approve your snapshot and choose to share it, and Force can suggest people for you."}</p>
+          <button type="button" onClick={() => (haptic(), f.push({ name: "persona" }))} className="press mt-4 h-11 w-full rounded-full bg-fill t-body font-medium text-ink">
+            Review your snapshot
+          </button>
+        </div>
+      )}
+
+      {inGraph && (
+        <section className="mt-8">
+          <h2 className="mb-3 px-1 t-body text-ink-3">Your connections</h2>
+          {mine.length ? (
+            <ul className="flex flex-col gap-2">
+              {mine.map((c) => {
+                const p = residentById(otherIn(c, me));
+                if (!p) return null;
+                return (
+                  <li key={c.id}>
+                    <button type="button" onClick={() => (haptic(), f.push({ name: "connection", id: p.id }))} className="press flex w-full items-start gap-3 rounded-[28px] bg-paper p-4 text-left" style={{ boxShadow: "var(--lift-1)" }}>
+                      <Face face={p.face} size={44} />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-2">
+                          <span className="t-body font-medium text-ink">{p.name}</span>
+                          <span className="rounded-full bg-fill px-2 py-[1px] t-meta text-ink-2">{CONNECTION_LABEL[c.type]}</span>
+                        </span>
+                        <span className="mt-1 block t-label text-ink-2">{c.why_connected}</span>
+                        <span className="mt-1 flex items-center gap-[6px] t-meta text-ink-3">
+                          <span className="h-[6px] w-[6px] rounded-full" style={{ background: c.origin === "reviewed" ? "var(--sage-4)" : "var(--grey-300)" }} aria-hidden />
+                          {c.origin === "reviewed" ? "Reviewed" : "Suggested by Force"}
+                        </span>
+                      </span>
+                      <I.Chevron size={16} className="mt-3 shrink-0 text-ink-4" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="rounded-[28px] bg-fill p-5 t-body text-ink-2">No connections yet. Force only suggests one when it can say why, from both people&apos;s snapshots. More residents are sharing through the day.</p>
+          )}
+        </section>
+      )}
+      <p className="mt-4 px-1 t-meta text-ink-3">
+        {residents + (inGraph ? 1 : 0)} {residents + (inGraph ? 1 : 0) === 1 ? "person has" : "people have"} approved and shared so far. Only approved, shared snapshots are in the graph.
+      </p>
+    </div>
   );
 }
 

@@ -1,44 +1,52 @@
 "use client";
 
-// The residency's own state: who you are, what you connected, your three answers, and the
-// persona Force read from them, with your edits. Saved in the browser; a visit starts fresh
-// unless the address has ?keep=1.
+// The residency's own state: who you are, your three answers and what you offer and seek,
+// Onairos, and the Intent Snapshot Force drafts from them, with your edits, your approval and
+// your sharing choice. It survives a refresh and reopening (the v1.1 definition of done);
+// ?reset=1 starts over.
 
 import { create } from "zustand";
 import type { Clip } from "@/data/mira";
-import { foundFor, pointsFrom, type Found, type LinkKind, type Point } from "@/data/residency";
-
-export type Fit = "spot" | "mostly" | "no";
+import type { LinkKind } from "@/data/residency";
+import type { Field, NextStep, OnairosNormalized, Snapshot, SynthInput } from "@/contract/residency";
+import * as api from "@/lib/r/api";
 
 interface R {
   done: boolean;
+  me: string; // your resident id
   name: string;
   links: Partial<Record<LinkKind, string>>;
   extra: string[]; // links that aren't one of the five
-  onairos: "off" | "busy" | "on";
+  onairos: "off" | "busy" | "on" | "failed";
+  persona: OnairosNormalized | null; // the normalized minimum; the raw payload is never kept
   answers: string[];
-  points: Point[];
-  found: Found[];
-  removed: string[]; // found items that weren't you
-  fit: Fit | null;
+  contribution: { can_offer: string[]; seeking: string[] };
+  snapshot: Snapshot | null;
+  synth: "idle" | "busy" | "failed";
   clips: Clip[]; // your recorded answers, for this visit only (the audio doesn't survive a refresh)
-  agreed: string[]; // points you said were you
   tab: "conversations" | "people"; // which half of home is showing
-  tip: boolean; // you've seen how to correct the patterns
+  tip: boolean; // you've seen how to correct the snapshot
 }
 
-const KEY = "force.residency";
-const FRESH: R = { done: false, name: "", links: {}, extra: [], onairos: "off", answers: [], points: [], found: [], removed: [], fit: null, clips: [], agreed: [], tab: "people", tip: false };
+const KEY = "force.residency.v2";
+const id = () => `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+const fresh = (): R => ({ done: false, me: id(), name: "", links: {}, extra: [], onairos: "off", persona: null, answers: [], contribution: { can_offer: [], seeking: [] }, snapshot: null, synth: "idle", clips: [], tab: "people", tip: false });
 
-// For the residency demo every visit starts from the beginning, decided here, before anything
-// renders, so there's never a flash of last visit. ?keep=1 picks up where you left off.
+// Decided before anything renders, so there's never a flash of the wrong step.
 const load = (): R => {
   try {
-    if (typeof window === "undefined" || new URLSearchParams(window.location.search).get("keep") !== "1") return FRESH;
+    if (typeof window === "undefined") return fresh();
+    if (new URLSearchParams(window.location.search).get("reset") === "1") {
+      localStorage.removeItem(KEY);
+      return fresh();
+    }
     const s = localStorage.getItem(KEY);
-    return s ? { ...FRESH, ...JSON.parse(s), clips: [], onairos: JSON.parse(s).onairos === "on" ? "on" : "off" } : FRESH;
+    if (!s) return fresh();
+    const o = JSON.parse(s) as Partial<R>;
+    // Work that was in flight when the page closed isn't any more.
+    return { ...fresh(), ...o, clips: [], onairos: o.onairos === "on" ? "on" : o.onairos === "busy" ? "off" : (o.onairos ?? "off"), synth: o.synth === "busy" ? (o.snapshot ? "idle" : "failed") : (o.synth ?? "idle") };
   } catch {
-    return FRESH;
+    return fresh();
   }
 };
 
@@ -52,22 +60,27 @@ useR.subscribe((s) => {
   } catch {}
 });
 
-// Once Force has read you, changing a link means reading what's online again. What you
-// already said wasn't you stays gone, and your rewrites stay yours.
-const reread = () => {
+const input = (): SynthInput => {
   const s = get();
-  if (s.answers.length) set({ found: foundFor(s.name, s.links) });
+  return { resident_id: s.me, name: s.name, answers: s.answers, contribution: s.contribution, onairos: s.persona };
+};
+
+// Every change to the snapshot goes through here. Changing what you approved means approving
+// it again before the cohort sees the new version.
+const patch = (fn: (s: Snapshot) => Snapshot) => {
+  const s = get().snapshot;
+  if (!s) return;
+  const next = fn(s);
+  set({ snapshot: { ...next, status: s.status === "approved" ? "pending_review" : next.status, updated_at: new Date().toISOString() } });
 };
 
 export const r = {
-  reread,
   setName(name: string) {
     set({ name });
-    reread();
+    patch((s) => ({ ...s, name: name.trim() || "You" }));
   },
   setLink(k: LinkKind, v: string) {
     set((s) => ({ links: { ...s.links, [k]: v } }));
-    reread();
   },
   setExtra(i: number, v: string) {
     set((s) => ({ extra: s.extra.map((x, j) => (j === i ? v : x)) }));
@@ -75,39 +88,67 @@ export const r = {
   addExtra() {
     set((s) => ({ extra: [...s.extra, ""] }));
   },
-  // Connecting Onairos is simulated here; the real one is their OnairosButton.
-  connectOnairos() {
-    if (get().onairos !== "off") return;
+  // The real Onairos button hands its payload in as raw; without it, the labelled sample.
+  async connectOnairos(raw?: unknown) {
+    if (get().onairos === "busy" || get().onairos === "on") return;
     set({ onairos: "busy" });
-    setTimeout(() => set({ onairos: "on" }), 1400);
+    try {
+      set({ persona: await api.onairos(raw), onairos: "on" });
+    } catch {
+      set({ onairos: "failed" });
+    }
   },
-  // Three answers in: read them, with the links, into a first persona.
-  read(answers: string[], clips: Clip[] = []) {
-    const s = get();
-    set({ answers, clips, points: pointsFrom(answers), found: foundFor(s.name, s.links), removed: [], fit: null, agreed: [] });
+  disconnectOnairos() {
+    set({ onairos: "off", persona: null });
   },
-  agree(id: string) {
-    set((s) => ({ agreed: s.agreed.includes(id) ? s.agreed : [...s.agreed, id] }));
+  setAnswers(answers: string[], clips: Clip[] = []) {
+    set({ answers, clips });
   },
-  editPoint(id: string, text: string) {
-    set((s) => ({ points: s.points.map((p) => (p.id === id ? { ...p, text } : p)) }));
+  setContribution(c: R["contribution"]) {
+    set({ contribution: c });
   },
-  dropPoint(id: string) {
-    set((s) => ({ points: s.points.filter((p) => p.id !== id) }));
+  // Answers in: Force drafts the snapshot. A failure leaves a way on, never a spinner.
+  async synthesize() {
+    set({ synth: "busy" });
+    try {
+      const snap = await api.synthesize(input());
+      set({ snapshot: snap, synth: "idle" });
+    } catch {
+      set({ synth: "failed" });
+    }
   },
-  addPoint(text: string) {
+  useDraft() {
+    set({ snapshot: api.draft(input()), synth: "idle" });
+  },
+  editField(k: Field, v: string | string[] | Snapshot["contribution"]) {
+    patch((s) => {
+      const value = k === "approach" ? (v as string[]).map((x) => x.trim()).filter(Boolean) : k === "contribution" ? (v as Snapshot["contribution"]) : ((v as string).trim() || null);
+      return { ...s, [k]: value, provenance: { ...s.provenance, [k]: value && (!Array.isArray(value) || value.length) ? ["user_edit"] : [] }, inferred: k === "approach" ? [] : s.inferred };
+    });
+  },
+  confirmField(k: Field) {
+    patch((s) => ({ ...s, inferred: k === "approach" ? [] : s.inferred, provenance: { ...s.provenance, [k]: [...new Set([...(s.provenance[k] ?? []), "user_edit" as const])] } }));
+  },
+  nextStep(status: NextStep["status"]) {
+    patch((s) => (s.next_step ? { ...s, next_step: { ...s.next_step, status } } : s));
+  },
+  // Your own wording, or your own step when Force had nothing good enough to suggest.
+  writeNextStep(text: string) {
     const t = text.trim();
     if (!t) return;
-    set((s) => ({ points: [...s.points, { id: `own${Date.now()}`, text: t, why: "You added this." }] }));
+    patch((s) => ({ ...s, next_step: { text: t, why_it_may_help: s.next_step?.why_it_may_help ?? "You chose this yourself.", status: "accepted", source: s.next_step && s.next_step.source !== "user" ? s.next_step.source : "user" } }));
   },
-  notMe(id: string) {
-    set((s) => ({ removed: [...s.removed, id] }));
+  // Sharing is its own choice. Once approved, turning it off takes you out of the graph now.
+  async setShared(shared: boolean) {
+    const s = get().snapshot;
+    if (!s) return;
+    if (s.status !== "approved") return set({ snapshot: { ...s, shared } });
+    set({ snapshot: await api.approve(s, shared) });
   },
-  undoNotMe() {
-    set((s) => ({ removed: s.removed.slice(0, -1) }));
-  },
-  setFit(fit: Fit) {
-    set({ fit });
+  async approve() {
+    const s = get().snapshot;
+    if (!s) return;
+    set({ snapshot: await api.approve(s, s.shared) });
   },
   finish(tab: R["tab"] = "people") {
     set({ done: true, tab });
@@ -118,5 +159,7 @@ export const r = {
   setTab(tab: R["tab"]) {
     set({ tab });
   },
+  startOver() {
+    set(fresh());
+  },
 };
-

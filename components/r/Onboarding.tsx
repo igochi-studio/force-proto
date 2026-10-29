@@ -3,14 +3,16 @@
 // The residency's way in. No number, no permission screens: the browser asks for the mic
 // when it needs it. The mark paints itself and the app moves on by itself to one page of
 // connectors. Then the three questions, as your first conversation with Force, answered by
-// recording (tap, talk, tap done) or by typing. Force reads it all into a persona you can
-// correct, and you land on the people here with your patterns.
+// recording (tap, talk, tap done) or by typing, and two optional ones about what you can
+// offer and what you'd value. Force drafts your Intent Snapshot; you check it, approve it,
+// and choose separately whether the residency sees it.
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Keyboard } from "lucide-react";
 import type { Art, Clip } from "@/data/mira";
-import { HEADLINE, LINKS, QUESTIONS } from "@/data/residency";
+import { LINKS, QUESTIONS } from "@/data/residency";
+import { FIELDS, OFFER_TAGS, SEEK_TAGS, isEmpty } from "@/contract/residency";
 import { f } from "@/lib/f/store";
 import { r, useR } from "@/lib/f/residency";
 import PaintedMark from "../f/PaintedMark";
@@ -18,7 +20,7 @@ import VoiceMode from "../f/VoiceMode";
 import { AudioBubble, Bubble, Typing } from "../f/Bubbles";
 import Glass from "../f/Glass";
 import { I, Logo, Paint, haptic } from "../f/ui";
-import Persona, { useWorld } from "./Persona";
+import Persona, { useYouWorld } from "./Persona";
 import { LinkList, NameField, OnairosCard } from "./Links";
 import PatternWorld from "./PatternWorld";
 
@@ -101,7 +103,7 @@ function Connect({ onNext }: { onNext: () => void }) {
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-6">
         <header className="px-1 pb-6 pt-10">
           <h1 className="t-large text-ink">Connect what&apos;s yours</h1>
-          <p className="mt-2 t-body text-ink-3">Paste your links. Force reads what&apos;s public to get a first sense of you.</p>
+          <p className="mt-2 t-body text-ink-3">Your name, and Onairos if you&apos;d like. Links are optional: they sit on your card for the residents you connect with.</p>
         </header>
 
         <NameField />
@@ -109,7 +111,7 @@ function Connect({ onNext }: { onNext: () => void }) {
         <OnairosCard className="mt-6" />
       </div>
       <div className="shrink-0 px-4 pb-3 pt-2">
-        <Primary onClick={onNext}>{filled || onairos === "on" ? "Continue" : "Continue without links"}</Primary>
+        <Primary onClick={onNext}>{filled || onairos === "on" ? "Continue" : "Continue without these"}</Primary>
       </div>
     </>
   );
@@ -118,6 +120,7 @@ function Connect({ onNext }: { onNext: () => void }) {
 // ── The three questions ──
 
 type Line = { id: string; from: "force" | "me"; text?: string; clip?: Clip; map?: boolean };
+type Phase = "ask" | "offer" | "seek" | "reading" | "failed" | "done";
 const LIMIT = 90;
 // The recorder: a glass bubble with the dusk painting in it.
 const ORB = { art: "hills" as Art, x: 58, y: 34, size: 76, zoom: 150 };
@@ -127,13 +130,16 @@ function Talk({ onNext }: { onNext: () => void }) {
   const [lines, setLines] = useState<Line[]>([]);
   const [typing, setTyping] = useState(false);
   const [qi, setQi] = useState(0);
-  const [phase, setPhase] = useState<"ask" | "reading" | "done">("ask");
+  const [phase, setPhase] = useState<Phase>("ask");
   const [voice, setVoice] = useState<{ x: number; y: number; el: HTMLElement | null } | null>(null);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false); // finished talking; the clip is on its way
+  const [needText, setNeedText] = useState(false); // the recording had no words Force could read
   const mapped = useRef(false);
   const answers = useRef<string[]>([]);
   const clips = useRef<Clip[]>([]);
+  const offer = useRef<string[]>([]);
+  const written = useRef<string[]>([]); // answers you typed
   const list = useRef<HTMLUListElement>(null);
   const root = useRef<HTMLDivElement>(null);
 
@@ -153,7 +159,7 @@ function Talk({ onNext }: { onNext: () => void }) {
     started.current = true;
     (async () => {
       const first = name.trim().split(/\s+/)[0];
-      await say(`${first ? `Hi ${first}. ` : ""}Three questions about you and the residency. Tap the bubble and talk, or type if you'd rather.`, 700);
+      await say(`${first ? `Hi ${first}. ` : ""}Three questions about what you want from the residency. Tap the bubble and talk, or type if you'd rather. About five minutes in all.`, 700);
       await say(QUESTIONS[0], 1000);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once
@@ -167,30 +173,72 @@ function Talk({ onNext }: { onNext: () => void }) {
     setSaving(false);
     // One answer per question, however it arrives
     if (answers.current.length !== qi) return;
-    setLines((l) => [...l, { id: `me${l.length}`, from: "me", ...a }]);
-    // A sample recording (no mic) has someone else's words; read the residency sample instead.
-    answers.current = [...answers.current, a.clip ? (a.clip.src ? a.clip.transcript : "") : (a.text ?? "")];
+    setLines((l) => [...l, { id: `me${l.length}${Date.now()}`, from: "me", ...a }]);
     if (a.clip) clips.current = [...clips.current, a.clip];
+    // A recording whose words this browser couldn't catch: keep it, and ask for a line typed.
+    // Force never fills the gap with words you didn't say.
+    if (a.clip && !a.clip.transcript.trim()) {
+      setNeedText(true);
+      await say("I kept your recording, but couldn't catch the words on this browser. Could you type a line or two?", 800);
+      return;
+    }
+    setNeedText(false);
+    if (a.text) written.current = [...written.current, a.text];
+    answers.current = [...answers.current, a.clip ? a.clip.transcript : (a.text ?? "")];
     if (qi + 1 < QUESTIONS.length) {
       setQi(qi + 1);
       await say(qi === 0 ? "Thank you. Next one." : "Last one.", 700);
       await say(QUESTIONS[qi + 1], 900);
       return;
     }
-    setPhase("reading");
-    await say("That's all three. Give me a moment.", 800);
-    r.read(answers.current, clips.current.filter((c) => c.src));
-    setLines((l) => [...l, { id: "map", from: "force", map: true }]);
-    // Your answers are your first moments in memory: recordings as voice notes, typed ones as written.
-    if (clips.current.length) f.keepClips(clips.current);
-    f.keepTexts(lines.filter((l) => l.from === "me" && l.text).map((l) => l.text!).concat(a.text ? [a.text] : []));
+    setPhase("offer");
+    await say("That's all three. Two quick optional ones, so the right people can find you.", 800);
+    await say("I can help others with…", 800);
   };
 
-  // The pattern map has finished painting: Force says what to do with it.
-  const read = async () => {
+  // What you offer, then what you'd value. Either can be skipped.
+  const contributed = async (picked: string[]) => {
+    const offering = phase === "offer";
+    if (picked.length) setLines((l) => [...l, { id: `me${l.length}${Date.now()}`, from: "me", text: picked.join(", ") }]);
+    if (offering) {
+      offer.current = picked;
+      setPhase("seek");
+      await say("I would value help with…", 800);
+      return;
+    }
+    r.setContribution({ can_offer: offer.current, seeking: picked });
+    await draft();
+  };
+
+  const draft = async () => {
+    setPhase("reading");
+    if (!mapped.current) await say("Thank you. Give me a moment to put it together.", 700);
+    r.setAnswers(answers.current, clips.current.filter((c) => c.src));
+    await r.synthesize();
+    if (useR.getState().synth === "failed") {
+      setPhase("failed");
+      await say("I couldn't put that together just now. Try again, or I'll make a plain draft straight from your answers.", 600);
+      return;
+    }
+    show();
+  };
+
+  const show = () => {
+    setLines((l) => (l.some((x) => x.map) ? l : [...l, { id: "map", from: "force", map: true }]));
     if (mapped.current) return;
     mapped.current = true;
-    await say("That's my first read of you. Tap it to open it up: keep what's true, fix what isn't.", 1100);
+    // Your answers are your first moments in memory: recordings as voice notes, typed ones as written.
+    const kept = clips.current.filter((c) => c.src);
+    if (kept.length) f.keepClips(kept);
+    f.keepTexts(written.current);
+  };
+
+  // The map has finished growing: Force says what to do with it.
+  const told = useRef(false);
+  const read = async () => {
+    if (told.current) return;
+    told.current = true;
+    await say("Here's what I understand so far. Tap it to check each part: keep what's right, fix what isn't. Nothing is shared until you say so.", 1100);
     setPhase("done");
   };
 
@@ -237,9 +285,20 @@ function Talk({ onNext }: { onNext: () => void }) {
       {/* Kept out of the photograph the water bends, so the orb never wobbles under itself */}
       <div data-no-shot className="shrink-0 px-4 pb-3 pt-1">
         {phase === "done" ? (
-          <Primary onClick={onNext}>Find people with this energy</Primary>
+          <Primary onClick={() => (haptic("soft"), setOpen(true))}>Check what Force understood</Primary>
         ) : phase === "ask" ? (
-          <Answer key={qi} disabled={typing || !!voice || saving} onListen={listen} onAnswer={answered} />
+          <Answer key={`${qi}${needText}`} disabled={typing || !!voice || saving} typed={needText} onListen={listen} onAnswer={answered} />
+        ) : phase === "offer" || phase === "seek" ? (
+          <Contribute key={phase} tags={phase === "offer" ? OFFER_TAGS : SEEK_TAGS} disabled={typing} placeholder={phase === "offer" ? "Or say it in a few words…" : "Or say what would help…"} onDone={contributed} />
+        ) : phase === "failed" ? (
+          <div className="flex flex-col gap-2">
+            <Primary onClick={() => (haptic(), draft())} disabled={typing}>
+              Try again
+            </Primary>
+            <button type="button" disabled={typing} onClick={() => (haptic(), r.useDraft(), show())} className="press h-11 w-full rounded-full bg-fill t-body font-medium text-ink">
+              Use a plain draft from my answers
+            </button>
+          </div>
         ) : (
           <div className="h-[116px]" />
         )}
@@ -264,16 +323,52 @@ function Talk({ onNext }: { onNext: () => void }) {
   );
 }
 
-// The pattern map, in the conversation, the way the world used to arrive. It grows out from
-// you while Force analyses; only when it's done does it become something you can open.
+// The two optional fields: quick tags you tap on and off, plus a few words of your own.
+function Contribute({ tags, placeholder, disabled, onDone }: { tags: readonly string[]; placeholder: string; disabled: boolean; onDone: (picked: string[]) => void }) {
+  const [on, setOn] = useState<string[]>([]);
+  const [own, setOwn] = useState("");
+  const picked = [...on, ...(own.trim() ? [own.trim()] : [])];
+  const flip = (t: string) => (haptic(), setOn((x) => (x.includes(t) ? x.filter((y) => y !== t) : [...x, t])));
+  return (
+    <div className="flex flex-col gap-2" style={{ opacity: disabled ? 0.55 : 1, transition: "opacity 300ms" }}>
+      <div className="scroll-row no-scrollbar -mx-4 px-4 pb-1" role="group" aria-label="Quick tags">
+        {tags.map((t) => (
+          <button key={t} type="button" aria-pressed={on.includes(t)} disabled={disabled} onClick={() => flip(t)} className={`press h-10 shrink-0 whitespace-nowrap rounded-full px-4 t-body transition-colors duration-200 ${on.includes(t) ? "chip-on" : "chip"}`}>
+            {t}
+          </button>
+        ))}
+      </div>
+      <form
+        className="flex min-h-[52px] items-center gap-1 rounded-full bg-paper pl-5 pr-[6px]"
+        style={{ boxShadow: "var(--lift-1)" }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (disabled) return;
+          haptic();
+          onDone(picked);
+        }}
+      >
+        <input value={own} onChange={(e) => setOwn(e.target.value)} placeholder={placeholder} aria-label={placeholder} enterKeyHint="done" className="min-w-0 flex-1 bg-transparent t-body text-ink outline-none placeholder:text-ink-3" />
+        <button type="submit" disabled={disabled} onPointerDown={(e) => e.preventDefault()} className={`press h-10 shrink-0 rounded-full px-4 t-label font-medium ${picked.length ? "bg-ink text-paper" : "bg-fill text-ink-2"}`}>
+          {picked.length ? "Done" : "Skip"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+// The snapshot, in the conversation, the way the world used to arrive. It grows out from you
+// once the draft is ready; only then does it become something you can open.
 function MapCard({ onOpen, onRead }: { onOpen: () => void; onRead: () => void }) {
-  const world = useWorld();
+  const world = useYouWorld();
+  const snapshot = useR((s) => s.snapshot);
   const [ready, setReady] = useState(false);
+  const filled = snapshot ? FIELDS.filter((k) => !isEmpty(snapshot, k)).length : 0;
   return (
     <button type="button" disabled={!ready} onClick={onOpen} className="press block w-full overflow-hidden rounded-[24px] bg-paper text-left disabled:active:scale-100" style={{ boxShadow: "var(--lift-1)" }}>
       <span className="flex h-11 items-center justify-between px-4 pt-1">
         <span className="flex items-center gap-2 t-label font-medium text-ink-2">
-          <Paint name="pattern-maps" h={16} /> Pattern map
+          <Paint name="pattern-maps" h={16} /> Intent snapshot
         </span>
         <span className="grid h-8 w-8 place-items-center rounded-full bg-fill text-ink transition-opacity duration-500" style={{ opacity: ready ? 1 : 0 }} aria-hidden>
           <I.Expand size={14} />
@@ -294,12 +389,14 @@ function MapCard({ onOpen, onRead }: { onOpen: () => void; onRead: () => void })
       <span className="block min-h-[68px] px-4 pb-4">
         {ready ? (
           <>
-            <span className="block t-body font-semibold text-ink">{HEADLINE}</span>
-            <span className="mt-1 block t-label text-ink-3">{world.nodes.filter((n) => n.kind === "intent").length} things you want to change, {world.nodes.filter((n) => n.kind === "person").length} people here who share them · tap to open</span>
+            <span className="block t-body font-semibold text-ink">Here&apos;s what Force understands so far</span>
+            <span className="mt-1 block t-label text-ink-3">
+              {filled} of 5 parts filled{filled < 5 ? `, ${5 - filled} for you to add` : ""} · tap to check
+            </span>
           </>
         ) : (
           <span className="block pt-2 t-label text-ink-3" aria-live="polite">
-            Analysing your answers and links…
+            Putting together what you said…
           </span>
         )}
       </span>
@@ -319,8 +416,8 @@ function YouPage({ onClose, onContinue }: { onClose: () => void; onContinue: () 
 
 // Answering: the glass bubble. Tap it and the screen turns to water from it while you talk;
 // tap anywhere when you're done. No holding, so it's the same on every phone. Or type.
-function Answer({ disabled, onListen, onAnswer }: { disabled: boolean; onListen: (el: HTMLElement) => void; onAnswer: (a: { text: string }) => void }) {
-  const [typing, setTypingMode] = useState(false);
+function Answer({ disabled, typed = false, onListen, onAnswer }: { disabled: boolean; typed?: boolean; onListen: (el: HTMLElement) => void; onAnswer: (a: { text: string }) => void }) {
+  const [typing, setTypingMode] = useState(typed);
   const [text, setText] = useState("");
 
   if (typing)

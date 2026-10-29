@@ -1,23 +1,13 @@
-// The residency: everyone here is already on Force. The three questions are about the work
-// and the room, and the persona Force builds is read from them, from the links you gave, and
-// from what's public. Mock data until the developers' agent output lands; every pattern still
-// quotes or counts your own answers.
+// The residency: everyone here is already on Force. The questions, the snapshot and the graph
+// follow the v1.1 contract in contract/residency.ts; this file holds what the screens need
+// around it: link kinds, faces, and the residents' painted covers. The pattern maps are drawn
+// from real snapshots and the cohort graph, never from made-up patterns.
 
 import type { Art } from "./mira";
 import type { Person } from "./social";
+import { CONNECTION_LABEL, condense, isConnection, personId, type Connection, type Graph, type Snapshot } from "@/contract/residency";
 
-export const QUESTIONS = [
-  "What are you working on here? A sentence or two is plenty.",
-  "What's the part of it you keep coming back to, even when nobody asks?",
-  "What would make this residency a win for you, beyond the work?",
-];
-
-// What the analysis reads when the browser couldn't transcribe an answer.
-export const SAMPLE_ANSWERS = [
-  "I'm building a tool that helps small farmers in Maharashtra price their crops before they go to market. Right now it's a WhatsApp bot and a lot of phone calls.",
-  "Honestly the calls. I keep going back to talking to the farmers themselves, even when I should be writing code. That's where I learn what to build.",
-  "If I leave with two or three people I'd call at midnight about this, that's a win. And one decision I've been putting off, finally made.",
-];
+export { QUESTIONS } from "@/contract/residency";
 
 export type LinkKind = "linkedin" | "x" | "instagram" | "github" | "site";
 // Each link is a glass bubble with its own crop of a painting inside.
@@ -42,139 +32,91 @@ export function pretty(kind: LinkKind | "extra", raw: string) {
   return s;
 }
 
-// What each link tells Force, once it's read.
-const FROM_LINK: Record<LinkKind, string> = {
-  linkedin: "Founder, Mandi Price. Before that, product at a food delivery company.",
-  x: "Posts mostly about farming, pricing and the odd cricket match.",
-  instagram: "Photos from farm visits around Nashik.",
-  github: "Twelve public projects, mostly Python, one WhatsApp bot.",
-  site: "Three essays on how small producers set prices.",
-};
-
-export interface Found {
-  id: string;
-  source: string;
-  text: string;
-  byName?: boolean; // found by searching your name, not from a link you gave
-}
-
-export function foundFor(name: string, links: Partial<Record<LinkKind, string>>): Found[] {
-  const first = name.trim() || "Someone with your name";
-  const out: Found[] = LINKS.filter((l) => links[l.kind]?.trim()).map((l) => ({ id: l.kind, source: l.name, text: FROM_LINK[l.kind] }));
-  out.push({ id: "talk", source: "Search", text: "Spoke on a panel about rural tech, Pune, 2024.", byName: true });
-  out.push({ id: "namesake", source: "Search", text: `${first}, co-founder of a payments startup in Gurgaon.`, byName: true });
-  return out;
-}
-
-// Onairos reads the apps you connect it to and hands back a personality read on the Big Five.
-// Force shows it in words, never as numbers.
-export const TRAITS: { name: string; level: string; line: string }[] = [
-  { name: "Openness", level: "High", line: "You go looking for new ways in." },
-  { name: "Conscientiousness", level: "In bursts", line: "Deep focus, then a reset." },
-  { name: "Extraversion", level: "Middle", line: "One-to-one lifts you; rooms drain you." },
-  { name: "Agreeableness", level: "High", line: "You lead with the other person's side." },
-  { name: "Emotional range", level: "Steady", line: "Short fuse only for wasted time." },
-];
-
-export interface Point {
-  id: string;
-  text: string; // what Force thinks
-  why: string; // what it's read from: a quote or a count
-}
-
-const STOP = new Set("about after again also always because been before being both could didn doing dont even every from have here into just know like little lot make more most much need only other really right said should some something still than that thats their them then there these they thing think this those through time very want what when where which while will with would your youre honestly finally okay yeah kind sort mean actually basically going thing maybe guess right well".split(" "));
-
-// Your own words, short enough to read at a glance.
-const clause = (s: string) => {
-  const w = s.trim().replace(/[.!?]$/, "").split(/\s+/);
-  return w.length <= 16 ? w.join(" ") : `${w.slice(0, 14).join(" ").replace(/[,;:]$/, "")}…`;
-};
-
-// A word you used in more than one answer, counted.
-function repeated(answers: string[]) {
-  const seen = new Map<string, Set<number>>();
-  answers.forEach((a, i) =>
-    a
-      .toLowerCase()
-      .replace(/[^a-z\s']/g, " ")
-      .split(/\s+/)
-      .map((w) => w.replace(/'s$/, "").replace(/s$/, ""))
-      .filter((w) => w.length > 3 && !STOP.has(w))
-      .forEach((w) => seen.set(w, (seen.get(w) ?? new Set()).add(i))),
-  );
-  return [...seen.entries()].filter(([, s]) => s.size > 1).sort((a, b) => b[1].size - a[1].size)[0];
-}
-
-export function pointsFrom(answers: string[]): Point[] {
-  const a = answers.map((x, i) => x.trim() || SAMPLE_ANSWERS[i]);
-  const r = repeated(a);
-  const out: Point[] = [
-    { id: "p1", text: "You learn by talking to people, not by reading about them.", why: `Answer 2: “${clause(a[1])}”` },
-    { id: "p2", text: "You're building for someone specific, not for a market.", why: `Answer 1: “${clause(a[0])}”` },
-    { id: "p3", text: "You came here for people more than for output.", why: `Answer 3: “${clause(a[2])}”` },
-  ];
-  if (r) out.push({ id: "p4", text: `“${r[0]}” is on your mind.`, why: `It came up in ${r[1].size === 3 ? "all three" : "two"} of your answers.` });
-  return out;
-}
-
-// What the patterns add up to, in one line. Mock until the agent writes it.
-export const HEADLINE = "A builder who learns by listening, and came here for the people.";
-
-// Your pattern map as nodes, in the founder's three kinds:
-//   you: the person
-//   intent: what you want to change, accomplish or understand (the problems you care about)
-//   theme: the concepts, fields and methods around it, which is where you meet other people
-// Residents who share a theme hang off it, so the map already shows who you'd meet. The map
-// shows each node's title (one or two words, written by the agent); opening it shows the
-// whole thought. Mock until the agent's output lands; every intent quotes its answer.
+// ── Pattern maps as nodes ──
+// The founder's three kinds: a person, what they want to change (intent & problem), and the
+// themes & approaches around it, which is where people meet. The map shows each node's
+// title (a few words); opening it shows the whole thought and where it came from.
 export type NodeKind = "you" | "intent" | "theme" | "person";
 export interface WNode {
   id: string;
   kind: NodeKind;
-  title: string; // one or two words: what the map shows
+  title: string; // a few words: what the map shows
   label: string; // the whole thought, for when you open it
   line?: string; // what it means, in a sentence
-  from?: string; // where Force read it
+  from?: string; // where it came from
   art: Art;
   person?: string; // a resident's id
 }
-export function worldFor(answers: string[], name: string): { nodes: WNode[]; edges: [string, string][] } {
-  const a = answers.map((x, i) => x.trim() || SAMPLE_ANSWERS[i]);
-  const nodes: WNode[] = [
-    { id: "you", kind: "you", title: name.trim().split(/\s+/)[0] || "You", label: name.trim() || "You", art: "hills" },
-    { id: "i1", kind: "intent", title: "Fair prices", label: "Fair prices for small farmers", line: "What you're building toward.", from: `Answer 1: “${clause(a[0])}”`, art: "meadow" },
-    { id: "i2", kind: "intent", title: "Listening first", label: "Learning from the people you build for", line: "How you like to work it out.", from: `Answer 2: “${clause(a[1])}”`, art: "park" },
-    { id: "i3", kind: "intent", title: "People first", label: "Leaving with people, not just output", line: "What would make this residency a win.", from: `Answer 3: “${clause(a[2])}”`, art: "dusk" },
-    { id: "t1", kind: "theme", title: "Markets", label: "Agricultural markets", from: "Your answers and LinkedIn", art: "meadow" },
-    { id: "t2", kind: "theme", title: "Pricing", label: "Pricing", from: "Your answers and your essays", art: "hills" },
-    { id: "t3", kind: "theme", title: "WhatsApp", label: "WhatsApp-first products", from: "GitHub", art: "water" },
-    { id: "t4", kind: "theme", title: "Field research", label: "Field research", from: "Your answers", art: "park" },
-    { id: "t5", kind: "theme", title: "Rural tech", label: "Rural tech", from: "A panel you spoke on", art: "water" },
-    { id: "t6", kind: "theme", title: "Community", label: "Community", from: "Your answers", art: "dusk" },
-    { id: "p-meera", kind: "person", title: "Meera", label: "Meera", person: "meera", art: "meadow" },
-    { id: "p-kabir", kind: "person", title: "Kabir", label: "Kabir", person: "kabir", art: "water" },
-    { id: "p-ananya", kind: "person", title: "Ananya", label: "Ananya", person: "ananya", art: "dusk" },
-  ];
-  const edges: [string, string][] = [
-    ["you", "i1"], ["you", "i2"], ["you", "i3"],
-    ["i1", "t1"], ["i1", "t2"], ["i1", "t3"], ["i2", "t4"], ["i2", "t5"], ["i3", "t6"],
-    ["t4", "p-meera"], ["t5", "p-kabir"], ["t1", "p-ananya"], ["t6", "p-ananya"],
-  ];
+
+const ARTS: Art[] = ["meadow", "hills", "water", "park", "dusk"];
+const artOf = (s: string) => ARTS[[...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % ARTS.length];
+// The first few words, ending on a word that carries meaning: "Run an AI tutor", not "Run an AI".
+const title = (s: string, n = 4) => {
+  const w = condense(s, n).replace(/…$/, "").replace(/[,.;:?!]+$/, "").split(" ");
+  while (w.length > 2 && /^(of|a|an|the|and|to|in|for|on|with|that|my|our|is|are)$/i.test(w[w.length - 1])) w.pop();
+  return w.join(" ");
+};
+const faceOf = (resident: string) => residentById(resident)?.face.art;
+
+// Yours: you, your intent and problem, the approaches around them, and the residents Force
+// connected you with, each hanging off what you share.
+export function youWorld(s: Snapshot | null, name: string, mine: Connection[] = []): { nodes: WNode[]; edges: [string, string][] } {
+  const first = name.trim().split(/\s+/)[0] || "You";
+  const nodes: WNode[] = [{ id: "you", kind: "you", title: first, label: name.trim() || "You", art: ME_FACE.art }];
+  const edges: [string, string][] = [];
+  if (!s) return { nodes, edges };
+  if (s.intent) {
+    nodes.push({ id: "intent", kind: "intent", title: title(s.intent), label: s.intent, line: "What you want to make progress on.", from: s.provenance.intent?.includes("user_edit") ? "You wrote this" : "Your answer to question 1", art: "meadow" });
+    edges.push(["you", "intent"]);
+  }
+  if (s.problem) {
+    nodes.push({ id: "problem", kind: "intent", title: title(s.problem), label: s.problem, line: "The problem underneath.", from: s.provenance.problem?.includes("user_edit") ? "You wrote this" : "Your answer to question 2", art: "dusk" });
+    edges.push(["you", "problem"]);
+  }
+  const hub = s.intent ? "intent" : s.problem ? "problem" : "you";
+  s.approach.forEach((a) => {
+    nodes.push({ id: `theme:${a}`, kind: "theme", title: a, label: a, line: "An approach or lens you work through.", from: s.inferred.includes(a) ? "Read from your wording, so check it" : "You confirmed this", art: artOf(a) });
+    edges.push([hub, `theme:${a}`]);
+  });
+  mine.forEach((c) => {
+    const other = c.source === personId(s.resident_id) ? c.target : c.source;
+    const rid = other.replace(/^person_/, "");
+    const p = residentById(rid);
+    if (!p) return;
+    const shared = c.type === "complementary_approach" ? s.approach.find((a) => nodes.some((n) => n.id === `theme:${a}`)) : undefined;
+    const at = shared ? `theme:${shared}` : c.type === "shared_problem" && s.problem ? "problem" : hub;
+    nodes.push({ id: `p:${rid}`, kind: "person", title: p.name, label: p.name, line: c.why_connected, from: CONNECTION_LABEL[c.type], art: p.face.art, person: rid });
+    edges.push([at, `p:${rid}`]);
+  });
   return { nodes, edges };
 }
 
-export const MOVES = ["Ask Meera how she ran her first twenty farmer interviews", "Block one morning this week for the decision you've been putting off"];
+// The cohort: every resident who approved and shared, their intents, the themes between
+// them, and the connections. Built only from what GET /api/residency/graph returns.
+export function cohortWorld(g: Graph, me: string): { nodes: WNode[]; edges: [string, string][] } {
+  const nodes: WNode[] = g.nodes.map((n) =>
+    n.type === "person"
+      ? { id: n.id, kind: n.resident_id === me ? "you" : "person", title: n.resident_id === me ? "You" : n.label, label: n.label, art: n.resident_id === me ? ME_FACE.art : (faceOf(n.resident_id!) ?? artOf(n.id)), person: n.resident_id }
+      : n.type === "intent_problem"
+        ? { id: n.id, kind: "intent", title: title(n.label), label: n.label, line: n.resident_id === me ? "What you want to make progress on." : `What ${residentById(n.resident_id!)?.name ?? "they"} want${residentById(n.resident_id!) ? "s" : ""} to make progress on.`, art: n.resident_id === me ? "meadow" : (faceOf(n.resident_id!) ?? artOf(n.id)), person: n.resident_id }
+        : { id: n.id, kind: "theme", title: n.label, label: n.label, line: "A theme or approach.", art: artOf(n.label) },
+  );
+  const edges: [string, string][] = g.edges.map((e) => [e.source, e.target]);
+  return { nodes, edges };
+}
 
-// The residency. Faces are painting crops until the real photos come in.
+export const connectionsIn = (g: Graph) => g.edges.filter(isConnection);
+
+// The residency. Faces are painting crops until the real photos come in. What each resident
+// is working on comes from their approved snapshot; this is only how they look and talk.
 export interface Resident extends Person {
   work: string; // what they're working on, in a line
-  pattern?: string; // the pattern you share, when Force found one
-  quest?: string; // the side quest Force suggests for you two, as a title
+  quest?: string; // a side quest you two could do, shown as a preview after the residency
   socials: LinkKind[]; // where else they are
 }
 
-const r = (p: Omit<Resident, "energy" | "age" | "where" | "km" | "story" | "differs" | "words" | "shares" | "socials"> & { art: Art; energy?: number; socials?: LinkKind[] }): Resident => ({
-  energy: p.pattern ? 0.8 : 0.4,
+const r = (p: Omit<Resident, "energy" | "age" | "where" | "km" | "story" | "differs" | "words" | "shares" | "socials" | "together"> & { art: Art; socials?: LinkKind[] }): Resident => ({
+  energy: 0.6,
   socials: ["linkedin", "instagram"],
   age: 0,
   where: "In the residency",
@@ -183,6 +125,7 @@ const r = (p: Omit<Resident, "energy" | "age" | "where" | "km" | "story" | "diff
   differs: "",
   words: "",
   shares: "",
+  together: "",
   ...p,
 });
 
@@ -192,14 +135,11 @@ export const RESIDENTS: Resident[] = [
     name: "Meera",
     art: "meadow",
     face: { art: "meadow", x: 30, y: 25 },
-    work: "Field research on how farming families borrow money",
-    pattern: "You both learn by talking to people.",
-    quest: "A morning of farmer calls, together",
-    energy: 0.92,
+    work: "Interviews on how farming families borrow money",
+    quest: "A morning of field interviews, together",
     socials: ["linkedin", "x", "site"],
-    together: "You've both spent this month on the phone with farmers. Side quest: run one morning of calls together on Thursday, swap what you hear over lunch?",
     quests: [{ name: "Farmer credit research", art: "meadow" }, { name: "Learning Marathi properly", art: "park" }],
-    reply: "Hi! Force says you're doing farmer calls too. I have a list of questions that took me months to get right, happy to share.",
+    reply: "Hi! Happy to compare notes. I have a list of interview questions that took me months to get right.",
   }),
   r({
     id: "kabir",
@@ -207,11 +147,8 @@ export const RESIDENTS: Resident[] = [
     art: "water",
     face: { art: "water", x: 70, y: 40 },
     work: "Cheap water sensors for village tanks",
-    pattern: "You both build for someone specific.",
     quest: "Saturday at Kabir's test tank",
-    energy: 0.84,
     socials: ["linkedin", "github", "instagram"],
-    together: "You're both building for villages you've actually visited. Side quest: a Saturday trip to the tank Kabir's testing at, an hour out of town?",
     quests: [{ name: "Water sensors", art: "water" }, { name: "Soldering on Sundays", art: "hills" }],
     reply: "Hey, I'm heading to the test site Saturday morning. There's a seat in the car if you want to see it.",
   }),
@@ -220,14 +157,11 @@ export const RESIDENTS: Resident[] = [
     name: "Ananya",
     art: "dusk",
     face: { art: "dusk", x: 20, y: 70 },
-    work: "A book about the markets of Pune",
-    pattern: "You both came here for people.",
+    work: "A book about the old markets of Pune",
     quest: "Mandai market at 6 a.m.",
-    energy: 0.76,
     socials: ["instagram", "site"],
-    together: "She's writing about markets, you're pricing what's sold in them. Side quest: walk Mandai market together early one morning?",
     quests: [{ name: "Writing a book", art: "dusk" }, { name: "Early morning walks", art: "meadow" }],
-    reply: "Mandai at 6 is the best hour. I'm going Friday, come?",
+    reply: "Hello! I'm at Mandai most mornings at 6 if you want to talk there.",
   }),
   r({
     id: "dev",
@@ -235,7 +169,6 @@ export const RESIDENTS: Resident[] = [
     art: "hills",
     face: { art: "hills", x: 60, y: 60 },
     work: "AI tutors for government schools",
-    together: "You're both shipping to people who don't use apps much. Side quest: trade one user call each and sit in on the other's?",
     quests: [{ name: "Classroom tutors", art: "hills" }],
     reply: "Hi! Always up for comparing notes on building for people who don't live on their phones.",
   }),
@@ -245,9 +178,8 @@ export const RESIDENTS: Resident[] = [
     art: "park",
     face: { art: "park", x: 45, y: 35 },
     work: "A documentary on the last letter-writers",
-    together: "You both collect people's stories for a living. Side quest: an evening of recording, she films, you listen?",
     quests: [{ name: "Documentary", art: "park" }, { name: "Film photography", art: "dusk" }],
-    reply: "Hello! Force thought we'd get on. I'm filming in the old city next week if you're curious.",
+    reply: "Hello! I'm filming in the old city next week if you're curious.",
   }),
   r({
     id: "arjun",
@@ -255,9 +187,8 @@ export const RESIDENTS: Resident[] = [
     art: "water",
     face: { art: "water", x: 15, y: 80 },
     work: "Open maps for small towns",
-    together: "His maps could show where your farmers sell. Side quest: one afternoon putting Nashik's markets on the map?",
     quests: [{ name: "Open maps", art: "water" }, { name: "Cycling", art: "meadow" }],
-    reply: "Hey. If you send me the markets you know, I'll put them on the map this week.",
+    reply: "Hey. Send me the markets you know and I'll put them on the map this week.",
   }),
 ];
 

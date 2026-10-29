@@ -49,6 +49,47 @@ export function layout(nodes: WNode[], edges: [string, string][]): PNode[] {
   });
 }
 
+// The cohort, Obsidian-style: residents round a ring that faces you (you at the bottom),
+// what each wants to change just inside them, and the themes further in, pulled toward
+// everyone who shares them, so a theme two people share sits between them. It stays facing
+// you, so a small cohort never hides half its people on the far side.
+export const ORDER_COHORT: Record<NodeKind, number> = { you: 0, person: 0, intent: 1, theme: 2 };
+export function layoutCohort(nodes: WNode[], edges: [string, string][]): PNode[] {
+  const at: Record<string, { a: number; r: number }> = {};
+  const people = [...nodes.filter((n) => n.kind === "you"), ...nodes.filter((n) => n.kind === "person")];
+  people.forEach((n, i) => (at[n.id] = { a: -Math.PI / 2 + (i / Math.max(1, people.length)) * Math.PI * 2, r: 1.08 }));
+  nodes
+    .filter((n) => n.kind === "intent")
+    .forEach((n) => {
+      const pa = edges.find(([, b]) => b === n.id)?.[0];
+      at[n.id] = { a: at[pa ?? ""]?.a ?? 0, r: 0.72 };
+    });
+  const pos: Record<string, V3> = {};
+  const xy = (id: string): [number, number] => [Math.cos(at[id].a) * at[id].r, Math.sin(at[id].a) * at[id].r];
+  const kids: Record<string, number> = {};
+  nodes
+    .filter((n) => n.kind === "theme")
+    .forEach((n) => {
+      const from = edges.filter(([, b]) => b === n.id).map(([a]) => a).filter((a) => at[a]);
+      if (from.length > 1) {
+        const sum = from.map(xy).reduce((s, p) => [s[0] + p[0], s[1] + p[1]], [0, 0]);
+        const l = Math.hypot(sum[0], sum[1]) || 1;
+        const r = Math.min(0.32, l / from.length);
+        pos[n.id] = [(sum[0] / l) * r, (sum[1] / l) * r, 0.42];
+      } else {
+        const pa = from[0] ?? "";
+        const k = (kids[pa] = (kids[pa] ?? 0) + 1);
+        const a = (at[pa]?.a ?? 0) + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.32 - (k === 1 ? 0.32 : 0);
+        pos[n.id] = [Math.cos(a) * 0.46, Math.sin(a) * 0.46, 0.38];
+      }
+    });
+  return nodes.map((n) => {
+    if (pos[n.id]) return { ...n, p: pos[n.id] };
+    const [x, y] = at[n.id] ? xy(n.id) : [0, 0];
+    return { ...n, p: [x, y * 0.92, n.kind === "intent" ? 0.42 : 0.36] };
+  });
+}
+
 export interface Camera {
   yaw: number;
   pitch: number;
@@ -80,8 +121,8 @@ export const BAND_ALPHA = [0.16, 0.5, 1] as const;
 export const bandOf = (near: number) => (near < 0.4 ? 0 : near < 0.6 ? 1 : 2);
 
 // Grows you first, then what you want, then the themes, then the people. t in seconds.
-export const growth = (kind: NodeKind, t: number) => {
-  const x = Math.max(0, Math.min(1, (t - 0.1 - ORDER[kind] * 0.55) / 0.8));
+export const growth = (kind: NodeKind, t: number, order: Record<NodeKind, number> = ORDER) => {
+  const x = Math.max(0, Math.min(1, (t - 0.1 - order[kind] * 0.55) / 0.8));
   return 1 - Math.pow(1 - x, 3);
 };
 export const GROWN_AT = 0.1 + 3 * 0.55 + 0.9;

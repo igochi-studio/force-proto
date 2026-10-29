@@ -1,7 +1,8 @@
 "use client";
 
 // Who you are online: your name, your links, Onairos. The same pieces on the way in and on
-// your own page, so you can change them any time; Force reads them again when you do.
+// your own page, so you can change them any time. Links only go on your card for the people
+// you connect with; Onairos is the one source Force reads, and only once you say so.
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -105,8 +106,10 @@ export function LinkList({ className = "" }: { className?: string }) {
   );
 }
 
+// Before anything connects: what's read, what Force takes from it, what it keeps, and why.
 export function OnairosCard({ className = "" }: { className?: string }) {
   const onairos = useR((s) => s.onairos);
+  const fixture = useR((s) => s.persona?.fixture);
   return (
     <div id="onairos" className={`rounded-[28px] bg-paper p-5 ${className}`} style={{ boxShadow: "var(--lift-1)" }}>
       <div className="flex items-center gap-4">
@@ -114,22 +117,54 @@ export function OnairosCard({ className = "" }: { className?: string }) {
           <OnairosMark size={40} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block t-body font-semibold text-ink">Onairos</span>
-          <span className="block t-label text-ink-3">Your ChatGPT, Instagram and YouTube, even the private parts</span>
+          <span className="flex items-center gap-2 t-body font-semibold text-ink">
+            Onairos <span className="rounded-full bg-fill px-2 py-[1px] t-meta font-normal text-ink-2">Optional</span>
+          </span>
+          <span className="block t-label text-ink-3">Reads the apps you pick inside Onairos, like ChatGPT, Instagram or YouTube</span>
         </span>
       </div>
-      <p className="mt-4 t-label text-ink-2">Force gets a short read of your personality from it. Never your chats or posts.</p>
-      <button type="button" onClick={() => (haptic(), r.connectOnairos())} disabled={onairos !== "off"} className={`press mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-full t-body font-medium transition-colors duration-300 ${onairos === "on" ? "bg-fill text-ink" : "bg-ink text-paper"} disabled:opacity-100`}>
-        {onairos === "on" ? (
-          <>
-            <I.Check size={16} /> Connected
-          </>
-        ) : onairos === "busy" ? (
-          "Connecting…"
-        ) : (
-          "Connect with Onairos"
-        )}
-      </button>
+      <dl className="mt-4 flex flex-col gap-2 t-label">
+        <div>
+          <dt className="inline font-medium text-ink">What Force gets: </dt>
+          <dd className="inline text-ink-2">a short general read (strengths, a summary, a few suggestions) and how much of your data it covered.</dd>
+        </div>
+        <div>
+          <dt className="inline font-medium text-ink">What Force keeps: </dt>
+          <dd className="inline text-ink-2">only that read, on this phone. Never your chats or posts.</dd>
+        </div>
+        <div>
+          <dt className="inline font-medium text-ink">Why: </dt>
+          <dd className="inline text-ink-2">to help spot the themes in your work. Never shared, never used to rank anyone.</dd>
+        </div>
+      </dl>
+      {onairos === "failed" ? (
+        <>
+          <p className="mt-4 t-label text-ink-2">Onairos didn&apos;t answer. You can try again, or carry on without it.</p>
+          <button type="button" onClick={() => (haptic(), r.connectOnairos())} className="press mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-ink t-body font-medium text-paper">
+            <I.Redo size={16} /> Try again
+          </button>
+        </>
+      ) : (
+        <button type="button" onClick={() => (haptic(), r.connectOnairos())} disabled={onairos !== "off"} className={`press mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-full t-body font-medium transition-colors duration-300 ${onairos === "on" ? "bg-fill text-ink" : "bg-ink text-paper"} disabled:opacity-100`}>
+          {onairos === "on" ? (
+            <>
+              <I.Check size={16} /> Connected
+            </>
+          ) : onairos === "busy" ? (
+            "Connecting…"
+          ) : (
+            "Connect with Onairos"
+          )}
+        </button>
+      )}
+      {onairos === "on" && (
+        <div className="mt-2 flex items-center justify-between px-1">
+          <span className="t-meta text-ink-3">{fixture ? "Sample data until the real Onairos is wired in" : "Connected"}</span>
+          <button type="button" onClick={() => (haptic(), r.disconnectOnairos())} className="press hit h-8 px-1 t-label font-medium text-ink-2">
+            Disconnect
+          </button>
+        </div>
+      )}
     </div>
   );
 }

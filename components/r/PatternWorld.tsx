@@ -13,7 +13,7 @@
 import { useEffect, useRef } from "react";
 import { ART_SRC, ART_TONE, type Art } from "@/data/mira";
 import type { NodeKind, WNode } from "@/data/residency";
-import { BAND_ALPHA, GROWN_AT, RADIUS, bandOf, growth, layout, nearness, project, type Camera, type PNode } from "@/lib/f/world";
+import { BAND_ALPHA, GROWN_AT, ORDER_COHORT, RADIUS, bandOf, growth, layout, layoutCohort, nearness, project, type Camera, type PNode } from "@/lib/f/world";
 import { painting } from "../f/Goo";
 import { haptic } from "../f/ui";
 
@@ -38,7 +38,8 @@ const INK: Record<NodeKind, string> = { you: "#1c1b1a", intent: "#1c1b1a", theme
 
 type Bead = { x: number; y: number; r: number; art: Art; band: number };
 
-export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, interactive = true }: { nodes: WNode[]; edges: [string, string][]; focus: string | null; onTap?: (id: string | null) => void; onGrown?: () => void; interactive?: boolean }) {
+// layout: "you" puts you in the middle of your own map; "cohort" spreads everyone out.
+export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, interactive = true, layout: mode = "you" }: { nodes: WNode[]; edges: [string, string][]; focus: string | null; onTap?: (id: string | null) => void; onGrown?: () => void; interactive?: boolean; layout?: "you" | "cohort" }) {
   const cv = useRef<HTMLCanvasElement>(null);
   const props = useRef({ focus, onTap, onGrown });
   useEffect(() => {
@@ -52,7 +53,8 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
     (Object.keys(ART_SRC) as Art[]).forEach(painting);
-    const world = layout(nodes, edges);
+    const world = mode === "cohort" ? layoutCohort(nodes, edges) : layout(nodes, edges);
+    const order = mode === "cohort" ? ORDER_COHORT : undefined;
     const byId = new Map(world.map((n) => [n.id, n]));
     const font = getComputedStyle(document.body).fontFamily || "system-ui, sans-serif";
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -97,7 +99,7 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
       C.pitch = Math.max(-1, Math.min(1, C.pitch + C.vp));
       C.vy *= 0.94;
       C.vp *= 0.94;
-      if (!reduce && !dragging && now - C.idleAt > 1800 && !props.current.focus) C.vy += (0.0018 - C.vy) * 0.03;
+      if (!reduce && !dragging && now - C.idleAt > 1800 && !props.current.focus && mode !== "cohort") C.vy += (0.0018 - C.vy) * 0.03;
       if (!told && (reduce || t > GROWN_AT)) {
         told = true;
         props.current.onGrown?.();
@@ -117,7 +119,7 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
       const bandFor = (z: number, on: boolean, always = false) => (!on ? DIM : foc || always ? 2 : bandOf(nearness(z)));
 
       const P = new Map(world.map((n) => {
-        const g = reduce ? 1 : growth(n.kind, t);
+        const g = reduce ? 1 : growth(n.kind, t, order);
         return [n.id, { ...project(n.p, C, W, H, 0.25 + 0.75 * g), g }];
       }));
       const beads: Bead[] = [];
@@ -336,7 +338,7 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
       canvas.removeEventListener("pointercancel", cancel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sig stands in for nodes and edges
-  }, [sig, interactive]);
+  }, [sig, interactive, mode]);
 
-  return <canvas ref={cv} className="block h-full w-full" style={{ touchAction: "pan-y", pointerEvents: interactive ? "auto" : "none" }} role="img" aria-label={`Your pattern map: ${nodes.filter((n) => n.kind === "intent").map((n) => n.title).join(", ")}`} />;
+  return <canvas ref={cv} className="block h-full w-full" style={{ touchAction: "pan-y", pointerEvents: interactive ? "auto" : "none" }} role="img" aria-label={mode === "cohort" ? `The residency's graph: ${nodes.filter((n) => n.kind === "person" || n.kind === "you").map((n) => n.title).join(", ")}` : `Your pattern map: ${nodes.filter((n) => n.kind === "intent").map((n) => n.title).join(", ")}`} />;
 }

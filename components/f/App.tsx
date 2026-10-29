@@ -20,13 +20,14 @@ import SheetHost from "./Sheet";
 import ResidencyOnboarding from "../r/Onboarding";
 import Persona from "../r/Persona";
 import Residents from "../r/Residents";
+import ConnectionPage from "../r/Connection";
 import { useR } from "@/lib/f/residency";
 import { SPRING, haptic } from "./ui";
 
 const keyOf = (s: Screen) => ("id" in s ? `${s.name}-${s.id}` : s.name);
 // Which side a page belongs to: memory pages close with a sideways swipe. Where a page grows
 // from is the spot you tapped (store.from); the corner of its pill is only the fallback.
-const surfaceOf = (s: Screen) => (["energy", "dm", "dive", "profile", "force", "persona"].includes(s.name) ? "energy-surface" : "memory-surface");
+const surfaceOf = (s: Screen) => (["energy", "dm", "dive", "profile", "force", "persona", "connection"].includes(s.name) ? "energy-surface" : "memory-surface");
 
 function Page({ s }: { s: Screen }) {
   switch (s.name) {
@@ -48,6 +49,8 @@ function Page({ s }: { s: Screen }) {
       return <Companion bare />;
     case "persona":
       return <Persona />;
+    case "connection":
+      return <ConnectionPage id={s.id} />;
   }
 }
 

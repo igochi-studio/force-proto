@@ -35,7 +35,8 @@ export type Screen =
   | { name: "dm"; id: string }
   | { name: "profile" }
   | { name: "force" } // the residency: talking to Force, opened from the conversations
-  | { name: "persona" }; // the residency: who Force thinks you are
+  | { name: "persona" } // the residency: who Force thinks you are
+  | { name: "connection"; id: string }; // the residency: why you and a resident are connected
 
 export interface Sheet {
   key: number;
@@ -181,14 +182,15 @@ export const f = {
   keepTexts(texts: string[]) {
     texts.forEach((text) => keep({ id: uid(), from: "me", kind: "text", text }));
   },
-  // The residency: every thread opens with Force saying why, and a side quest to vote on.
-  openThread(id: string) {
+  // The residency: a thread opens with Force saying why you're connected and what you could
+  // explore together, from the connection itself. Without a connection, Force doesn't invent one.
+  openThread(id: string, intro?: { why: string; explore: string }) {
     const p = personById(id);
     if (!p || get().dms[id]?.length) return;
-    const why = (p as { pattern?: string }).pattern;
+    const lines = intro ? [intro.why, `Something to explore together: ${intro.explore}`] : [p.together || `You and ${p.name}, with me in the middle.`];
     set((s) => ({
       reached: { ...s.reached, [id]: "yes" },
-      dms: { ...s.dms, [id]: [{ id: uid("d"), from: "force", text: why ? `${why} I'm here too.` : `You and ${p.name}, with me in the middle.` }, { id: uid("d"), from: "force", text: p.together, poll: { options: ["We're in", "Something else"], votes: {} } }] },
+      dms: { ...s.dms, [id]: lines.map((text) => ({ id: uid("d"), from: "force" as const, text })) },
     }));
   },
   setSetting(k: keyof Settings, v: boolean) {
