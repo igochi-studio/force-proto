@@ -66,7 +66,7 @@ for (const run of runs) {
     await page.getByRole("button", { name: "Disconnect" }).waitFor({ timeout: 2000 });
   });
   await step("continue", () => tap(page.getByRole("button", { name: "Continue", exact: true })));
-  await step("first question", () => page.getByText("By the end of this residency").waitFor({ timeout: 8000 }));
+  await step("first question", () => page.getByText("What are you working toward right now").waitFor({ timeout: 8000 }));
   await shot("2-questions");
 
   const typeAnswer = async (text) => {

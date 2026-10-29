@@ -66,11 +66,12 @@ const SNAPSHOT_TASK = `A resident has just answered three questions, by voice or
 
 How to write each field:
 - Write it the way they'd put it on their clearest day. Fix typos and mishearings, use the other answers to make vague words specific, and keep their meaning. Don't add facts they didn't give.
-- intent: what they want to have made progress on by the end of the residency, and why it matters to them. One sentence, starting with a verb, at most 25 words.
-- problem: the problem underneath, who it's for, and why it's worth solving. One sentence, at most 25 words.
-- current_frontier: their biggest open question or blocker, written as the sharp question it really is. At most 20 words.
+- The questions map to fields like this. Answer 1 is intent. Answer 2 is problem. Answer 3 has two halves: how they're approaching it (approach) and what they're still trying to figure out (current_frontier).
+- intent: what they're working toward right now, and why it matters to them. One sentence, starting with a verb, at most 25 words.
+- problem: the problem, question or opportunity they're focused on, in their framing (an opportunity stays an opportunity; don't turn it into a problem). One sentence, at most 25 words.
+- current_frontier: what they're still trying to figure out, from the second half of Answer 3, written as the sharp question it really is. At most 20 words. If Answer 3 only covers their approach, use the clearest open question from the other answers, or null.
 - intent_title, problem_title: two to four words each, a noun phrase for a map node (for example "Proof of demand", "Forgotten decisions").
-- approach: one to four lenses they work through: methods, fields, technical choices or research areas, one to three words each. Include ones that are clearly implied by how they talk about the work, and list any you implied (rather than ones they said) again in approach_inferred. Onairos strengths may support a lens they already touched on but must never introduce one by themselves.
+- approach: one to four lenses they work through: methods, fields, technical choices or research areas, one to three words each, mainly from the first half of Answer 3 (how they're approaching it). Include ones clearly implied by how they talk about the work, and list any you implied (rather than ones they said) again in approach_inferred. Onairos strengths may support a lens they already touched on but must never introduce one by themselves.
 - If an answer is empty, or too thin to understand without guessing, return null for that field. Never invent.
 - next_step: one small action, starting with a verb, doable in 10 to 30 minutes or one conversation, that moves their current frontier. why_it_may_help: at most 20 words, grounded in what they said. If an Onairos suggestion genuinely fits their frontier, adapt it and set from_onairos_nudge true. If there's too little to go on, return null.
 - noticed: one to three things you read between the lines by putting the answers (and Onairos, if given) together: a tension, the real question under the stated one, or what their words show about how they work. Second person, at most 25 words each, specific to them. No compliments, no personality labels, no scores. For each, list where it came from, like "Answer 1", "Answer 3", "Onairos: Curiosity".
@@ -99,7 +100,7 @@ export async function readSnapshot(i: SynthInput, base: Snapshot, themes: string
   else delete provenance.problem;
   if (out.current_frontier) provenance.current_frontier = ["user_answer:q3"];
   else delete provenance.current_frontier;
-  if (approach.length) provenance.approach = o?.positive.length ? ["user_answer", "onairos:positive_traits"] : ["user_answer"];
+  if (approach.length) provenance.approach = o?.positive.length ? ["user_answer:q3", "onairos:positive_traits"] : ["user_answer:q3"];
   else delete provenance.approach;
   return {
     ...base,

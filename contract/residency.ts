@@ -18,9 +18,9 @@
 // ── The questions (final wording, §1) ──
 
 export const QUESTIONS = [
-  "By the end of this residency, what do you want to have made progress on, and why does it matter to you?",
-  "What problem are you trying to solve, who is it for, and what makes it worth solving?",
-  "What is the biggest unanswered question or blocker you want to make progress on before the residency ends?",
+  "What are you working toward right now, and why does it matter to you?",
+  "What problem, question, or opportunity are you focused on?",
+  "How are you approaching it so far and what are you still trying to figure out?",
 ] as const;
 
 // Quick tags for the two optional contribution fields. Short text can be added to either.
@@ -82,8 +82,8 @@ export const FIELD_LABEL: Record<Field, string> = {
 };
 
 export const FIELD_MEANING: Record<Field, string> = {
-  intent: "What you want to make progress on here",
-  problem: "The challenge underneath, and why it matters",
+  intent: "What you're working toward, and why it matters",
+  problem: "The problem, question or opportunity you're focused on",
   approach: "Methods, technical choices, research areas, lenses",
   current_frontier: "The open question or blocker",
   contribution: "What you can offer, and what you're looking for",
@@ -271,12 +271,22 @@ export function nextStepFor(frontier: string | null, intent: string | null, o: O
   return { text: "Tell one resident what you want to have made progress on by the end", why_it_may_help: `Saying it out loud early is how people here find you: “${condense(intent!, 12)}”`, status: "suggested", source: "force" };
 }
 
+// "I'm prototyping with five teams, and I'm still figuring out whether they'd pay" →
+// ["I'm prototyping with five teams", "whether they'd pay"]. If the open half can't be found,
+// the whole answer stands in for it.
+export function splitApproach(a: string): [string, string] {
+  const m = /(.*?)[,;.]?\s*(?:and\s+)?(?:what\s+)?(?:i'?m|i am|we'?re|we are)?\s*(?:still\s+)?(?:trying to\s+)?(?:figur(?:e|ing) out|unsure|not sure|wondering)\s*(?:is|about)?\s*(.*)/i.exec(a);
+  return m && m[2].trim() ? [m[1].trim(), m[2].trim()] : [a, a];
+}
+
 export function synthesize(i: SynthInput, now = new Date()): Snapshot {
   const a = [0, 1, 2].map((k) => (i.answers[k] ?? "").trim());
   const intent = condense(a[0]) || null;
   const problem = condense(a[1]) || null;
-  const current_frontier = condense(a[2]) || null;
-  const said = lensesIn(a.join(" "));
+  // Question 3 is two halves: how you're approaching it, then what you're still figuring out.
+  const [how, open] = splitApproach(a[2]);
+  const current_frontier = condense(open) || null;
+  const said = [...new Set([...lensesIn(how), ...lensesIn(a.join(" "))])];
   // Onairos can support a theme the person already touched on; it can't add a new one by itself.
   const supported = new Set((i.onairos?.positive ?? []).flatMap((t) => lensesIn(`${t.name} ${t.evidence ?? ""}`)));
   const approach = said.slice(0, 4);
@@ -284,7 +294,7 @@ export function synthesize(i: SynthInput, now = new Date()): Snapshot {
   if (intent) provenance.intent = ["user_answer:q1"];
   if (problem) provenance.problem = ["user_answer:q2"];
   if (current_frontier) provenance.current_frontier = ["user_answer:q3"];
-  if (approach.length) provenance.approach = approach.some((x) => supported.has(x)) ? ["user_answer", "onairos:positive_traits"] : ["user_answer"];
+  if (approach.length) provenance.approach = [lensesIn(how).length ? "user_answer:q3" : "user_answer", ...(approach.some((x) => supported.has(x)) ? (["onairos:positive_traits"] as const) : [])];
   const contribution = { can_offer: i.contribution.can_offer.filter(Boolean), seeking: i.contribution.seeking.filter(Boolean) };
   if (contribution.can_offer.length + contribution.seeking.length) provenance.contribution = ["contribution_fields"];
   return {

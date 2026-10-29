@@ -23,7 +23,7 @@ export function WordsBar({ answers }: { answers: string[] }) {
   const parts = [
     { key: "intent" as const, label: "Intent", n: words(answers[0] ?? "") },
     { key: "problem" as const, label: "Problem", n: words(answers[1] ?? "") },
-    { key: "current_frontier" as const, label: "Open question", n: words(answers[2] ?? "") },
+    { key: "current_frontier" as const, label: "Approach & open question", n: words(answers[2] ?? "") },
   ];
   const total = parts.reduce((a, p) => a + p.n, 0);
   if (!total) return null;

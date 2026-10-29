@@ -168,7 +168,7 @@ function sourceOf(s: Snapshot, k: Field, onairos: boolean) {
   const p = s.provenance[k] ?? [];
   if (p.includes("user_edit")) return "You said this";
   const base = SOURCE[p[0]] ?? "";
-  if (k === "approach" && s.inferred.length) return `${base}${p.includes("onairos:positive_traits") && onairos ? ", supported by Onairos" : ""}. A guess, so check it.`;
+  if (k === "approach") return `${base}${p.includes("onairos:positive_traits") && onairos ? ", supported by Onairos" : ""}${s.inferred.length ? `. ${s.inferred.length === s.approach.length ? "Read between the lines" : `${s.inferred.join(", ")} read between the lines`}, so check it.` : ""}`;
   return base;
 }
 
