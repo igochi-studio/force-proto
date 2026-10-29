@@ -141,23 +141,27 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
         }
       });
       hits.length = 0;
-      const labels: { x: number; y: number; z: number; size: number; weight: number; text: string; alpha: number; color: string; first: boolean }[] = [];
+      const labels: { id: string; x: number; y: number; r: number; z: number; size: number; weight: number; text: string; alpha: number; color: string; first: boolean }[] = [];
+      const discs: { id: string; x: number; y: number; r: number }[] = [];
       world.forEach((n) => {
         const q = P.get(n.id)!;
         if (q.g <= 0.01) return;
-        const r = RADIUS[n.kind] * q.s * (0.3 + 0.7 * q.g);
+        const r = RADIUS[n.kind] * (mode === "cohort" && n.kind === "intent" ? 0.7 : 1) * q.s * (0.3 + 0.7 * q.g);
         const band = bandFor(q.z, lit(n.id), n.kind === "you");
         beads.push({ x: q.x, y: q.y, r, art: n.art, band });
         hits.push({ n, x: q.x, y: q.y, r: Math.max(r, 18) });
         const size = (n.kind === "you" ? 13 : n.kind === "intent" ? 12.5 : 11.5) * (0.85 + 0.2 * nearness(q.z));
+        discs.push({ id: n.id, x: q.x, y: q.y, r });
         labels.push({
+          id: n.id,
           x: q.x,
-          y: q.y + r + size + 2,
+          y: q.y,
+          r,
           z: n.kind === "you" ? 9 : q.z,
           size,
           weight: n.kind === "you" || n.kind === "intent" ? 600 : 500,
           text: n.title,
-          alpha: Math.min(1, q.g * 1.5) * (band === DIM ? 0.12 : BAND_ALPHA[band]),
+          alpha: mode === "cohort" && n.kind === "intent" && !(foc && near.has(n.id)) ? 0 : Math.min(1, q.g * 1.5) * (band === DIM ? 0.12 : BAND_ALPHA[band]),
           color: n.id === foc ? "#1c1b1a" : INK[n.kind],
           first: n.id === foc,
         });
@@ -218,8 +222,15 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         });
 
-      // Names under the nodes, nearest first so none overlap; the one you tapped always.
+      // Names beside their nodes, nearest first. Each tries below, above, right and left of
+      // its node and takes the spot that covers the fewest other names, nodes and strands; a
+      // name that can only sit on another name waits (the one you tapped never does).
       const placed: [number, number, number, number][] = [];
+      const hitsBox = (b: [number, number, number, number], x: number, y: number, rr: number) => {
+        const cx = Math.max(b[0], Math.min(x, b[2]));
+        const cy = Math.max(b[1], Math.min(y, b[3]));
+        return Math.hypot(cx - x, cy - y) < rr + 1.5;
+      };
       ctx.textAlign = "center";
       ctx.textBaseline = "alphabetic";
       labels
@@ -228,13 +239,27 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
           if (l.alpha < 0.05) return;
           ctx.font = `${l.weight} ${l.size.toFixed(1)}px ${font}`;
           const w = ctx.measureText(l.text).width;
-          const x = Math.max(w / 2 + 4, Math.min(W - w / 2 - 4, l.x));
-          const box: [number, number, number, number] = [x - w / 2 - 3, l.y - l.size, x + w / 2 + 3, l.y + 3];
-          if (placed.some((p) => box[0] < p[2] && box[2] > p[0] && box[1] < p[3] && box[3] > p[1])) return;
-          placed.push(box);
+          const spots: [number, number][] = [
+            [l.x, l.y + l.r + l.size + 2],
+            [l.x, l.y - l.r - 5],
+            [l.x + l.r + 6 + w / 2, l.y + l.size * 0.35],
+            [l.x - l.r - 6 - w / 2, l.y + l.size * 0.35],
+          ];
+          let best: { box: [number, number, number, number]; x: number; y: number; cost: number } | null = null;
+          for (const [sx, sy] of spots) {
+            const x = Math.max(w / 2 + 4, Math.min(W - w / 2 - 4, sx));
+            const box: [number, number, number, number] = [x - w / 2 - 3, sy - l.size, x + w / 2 + 3, sy + 3];
+            if (box[1] < 2 || box[3] > H - 2) continue;
+            let cost = placed.some((p) => box[0] < p[2] && box[2] > p[0] && box[1] < p[3] && box[3] > p[1]) ? 1000 : 0;
+            for (const d of discs) if (d.id !== l.id && hitsBox(box, d.x, d.y, d.r)) cost += 60;
+            for (const b of beads) if (b.band !== DIM && hitsBox(box, b.x, b.y, b.r)) cost += 2;
+            if (!best || cost < best.cost) best = { box, x, y: sy, cost };
+          }
+          if (!best || (best.cost >= 1000 && !l.first)) return;
+          placed.push(best.box);
           ctx.globalAlpha = l.alpha;
           ctx.fillStyle = l.color;
-          ctx.fillText(l.text, x, l.y);
+          ctx.fillText(l.text, best.x, best.y);
         });
       ctx.globalAlpha = 1;
       // A map you can't touch settles once it has grown: one still frame, nothing running.

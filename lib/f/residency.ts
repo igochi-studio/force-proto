@@ -8,7 +8,7 @@
 import { create } from "zustand";
 import type { Clip } from "@/data/mira";
 import type { LinkKind } from "@/data/residency";
-import type { Field, NextStep, OnairosNormalized, Snapshot, SynthInput } from "@/contract/residency";
+import { visible, type Connection, type Field, type NextStep, type OnairosNormalized, type Snapshot, type SynthInput } from "@/contract/residency";
 import * as api from "@/lib/r/api";
 
 interface R {
@@ -23,6 +23,8 @@ interface R {
   contribution: { can_offer: string[]; seeking: string[] };
   snapshot: Snapshot | null;
   synth: "idle" | "busy" | "failed";
+  mine: Connection[]; // your connections, once you've approved and shared
+  linking: boolean; // Force is looking for them
   clips: Clip[]; // your recorded answers, for this visit only (the audio doesn't survive a refresh)
   tab: "conversations" | "people"; // which half of home is showing
   tip: boolean; // you've seen how to correct the snapshot
@@ -30,7 +32,7 @@ interface R {
 
 const KEY = "force.residency.v2";
 const id = () => `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-const fresh = (): R => ({ done: false, me: id(), name: "", links: {}, extra: [], onairos: "off", persona: null, answers: [], contribution: { can_offer: [], seeking: [] }, snapshot: null, synth: "idle", clips: [], tab: "people", tip: false });
+const fresh = (): R => ({ done: false, me: id(), name: "", links: {}, extra: [], onairos: "off", persona: null, answers: [], contribution: { can_offer: [], seeking: [] }, snapshot: null, synth: "idle", mine: [], linking: false, clips: [], tab: "people", tip: false });
 
 // Decided before anything renders, so there's never a flash of the wrong step.
 const load = (): R => {
@@ -44,7 +46,7 @@ const load = (): R => {
     if (!s) return fresh();
     const o = JSON.parse(s) as Partial<R>;
     // Work that was in flight when the page closed isn't any more.
-    return { ...fresh(), ...o, clips: [], onairos: o.onairos === "on" ? "on" : o.onairos === "busy" ? "off" : (o.onairos ?? "off"), synth: o.synth === "busy" ? (o.snapshot ? "idle" : "failed") : (o.synth ?? "idle") };
+    return { ...fresh(), ...o, clips: [], linking: false, onairos: o.onairos === "on" ? "on" : o.onairos === "busy" ? "off" : (o.onairos ?? "off"), synth: o.synth === "busy" ? (o.snapshot ? "idle" : "failed") : (o.synth ?? "idle") };
   } catch {
     return fresh();
   }
@@ -63,6 +65,18 @@ useR.subscribe((s) => {
 const input = (): SynthInput => {
   const s = get();
   return { resident_id: s.me, name: s.name, answers: s.answers, contribution: s.contribution, onairos: s.persona };
+};
+
+// Who you're connected with follows what you've approved and shared, and nothing else.
+const link = async () => {
+  const s = get().snapshot;
+  if (!s || !visible(s)) return set({ mine: [], linking: false });
+  set({ linking: true });
+  try {
+    set({ mine: await api.connections(s), linking: false });
+  } catch {
+    set({ linking: false });
+  }
 };
 
 // Every change to the snapshot goes through here. Changing what you approved means approving
@@ -144,12 +158,15 @@ export const r = {
     if (!s) return;
     if (s.status !== "approved") return set({ snapshot: { ...s, shared } });
     set({ snapshot: await api.approve(s, shared) });
+    await link();
   },
   async approve() {
     const s = get().snapshot;
     if (!s) return;
     set({ snapshot: await api.approve(s, s.shared) });
+    void link();
   },
+  relink: link,
   finish(tab: R["tab"] = "people") {
     set({ done: true, tab });
   },

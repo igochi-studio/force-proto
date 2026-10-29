@@ -109,7 +109,6 @@ export function LinkList({ className = "" }: { className?: string }) {
 // Before anything connects: what's read, what Force takes from it, what it keeps, and why.
 export function OnairosCard({ className = "" }: { className?: string }) {
   const onairos = useR((s) => s.onairos);
-  const fixture = useR((s) => s.persona?.fixture);
   return (
     <div id="onairos" className={`rounded-[28px] bg-paper p-5 ${className}`} style={{ boxShadow: "var(--lift-1)" }}>
       <div className="flex items-center gap-4">
@@ -158,12 +157,9 @@ export function OnairosCard({ className = "" }: { className?: string }) {
         </button>
       )}
       {onairos === "on" && (
-        <div className="mt-2 flex items-center justify-between px-1">
-          <span className="t-meta text-ink-3">{fixture ? "Sample data until the real Onairos is wired in" : "Connected"}</span>
-          <button type="button" onClick={() => (haptic(), r.disconnectOnairos())} className="press hit h-8 px-1 t-label font-medium text-ink-2">
-            Disconnect
-          </button>
-        </div>
+        <button type="button" onClick={() => (haptic(), r.disconnectOnairos())} className="press mx-auto mt-1 flex h-9 items-center px-3 t-label text-ink-3">
+          Disconnect
+        </button>
       )}
     </div>
   );

@@ -62,20 +62,24 @@ const faceOf = (resident: string) => residentById(resident)?.face.art;
 // connected you with, each hanging off what you share.
 export function youWorld(s: Snapshot | null, name: string, mine: Connection[] = []): { nodes: WNode[]; edges: [string, string][] } {
   const first = name.trim().split(/\s+/)[0] || "You";
-  const nodes: WNode[] = [{ id: "you", kind: "you", title: first, label: name.trim() || "You", art: ME_FACE.art }];
+  const nodes: WNode[] = [{ id: "you", kind: "you", title: first, label: name.trim() || "You", line: s?.noticed?.[0]?.text, from: s?.noticed?.[0] ? `From ${s.noticed[0].from.join(", ")}` : undefined, art: ME_FACE.art }];
   const edges: [string, string][] = [];
   if (!s) return { nodes, edges };
   if (s.intent) {
-    nodes.push({ id: "intent", kind: "intent", title: title(s.intent), label: s.intent, line: "What you want to make progress on.", from: s.provenance.intent?.includes("user_edit") ? "You wrote this" : "Your answer to question 1", art: "meadow" });
+    nodes.push({ id: "intent", kind: "intent", title: s.titles?.intent ?? title(s.intent), label: s.intent, line: s.takes?.intent, from: s.provenance.intent?.includes("user_edit") ? "You wrote this" : "Your answer to question 1", art: "meadow" });
     edges.push(["you", "intent"]);
   }
   if (s.problem) {
-    nodes.push({ id: "problem", kind: "intent", title: title(s.problem), label: s.problem, line: "The problem underneath.", from: s.provenance.problem?.includes("user_edit") ? "You wrote this" : "Your answer to question 2", art: "dusk" });
+    nodes.push({ id: "problem", kind: "intent", title: s.titles?.problem ?? title(s.problem), label: s.problem, line: s.takes?.problem, from: s.provenance.problem?.includes("user_edit") ? "You wrote this" : "Your answer to question 2", art: "dusk" });
     edges.push(["you", "problem"]);
+  }
+  if (s.current_frontier) {
+    nodes.push({ id: "frontier", kind: "intent", title: "Open question", label: s.current_frontier, line: s.takes?.current_frontier, from: s.provenance.current_frontier?.includes("user_edit") ? "You wrote this" : "Your answer to question 3", art: "water" });
+    edges.push([s.intent ? "intent" : "you", "frontier"]);
   }
   const hub = s.intent ? "intent" : s.problem ? "problem" : "you";
   s.approach.forEach((a) => {
-    nodes.push({ id: `theme:${a}`, kind: "theme", title: a, label: a, line: "An approach or lens you work through.", from: s.inferred.includes(a) ? "Read from your wording, so check it" : "You confirmed this", art: artOf(a) });
+    nodes.push({ id: `theme:${a}`, kind: "theme", title: a, label: a, line: s.takes?.approach?.[a], from: s.inferred.includes(a) ? "Read from your wording, so check it" : "You confirmed this", art: artOf(a) });
     edges.push([hub, `theme:${a}`]);
   });
   mine.forEach((c) => {

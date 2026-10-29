@@ -2,8 +2,9 @@
 
 // Recording in the browser. The microphone is real when it's allowed: we keep the audio, draw
 // the live level, and read energy and pauses from the recording itself. Words come from the
-// browser's speech recognition where it exists. When either isn't available, the prototype
-// falls back to a sample so the flow still works.
+// server (/api/transcribe), with the browser's own speech recognition as the fallback, so
+// browsers without it (Dia, Arc, Firefox) still get your words. Without a microphone the
+// prototype falls back to a sample so the flow still works.
 
 import { SAMPLE_CLIP, USUAL, type Clip, type Moment } from "@/data/mira";
 
@@ -133,11 +134,11 @@ export async function record(): Promise<Recording> {
           const blob = new Blob(chunks, { type: mr.mimeType || "audio/mp4" });
           const secs = (performance.now() - started) / 1000;
           const url = URL.createObjectURL(blob);
-          // Give recognition a moment to deliver its last words.
-          await new Promise((r) => setTimeout(r, 450));
-          const read = await readSignals(blob).catch(() => null);
+          // The server's transcript and the recording's own signals, side by side; the
+          // browser's words (given a moment to arrive) if the server has none.
+          const [heard, read] = await Promise.all([transcribe(blob), readSignals(blob).catch(() => null), new Promise((r) => setTimeout(r, 450))]);
           // Only ever her own words: if nothing was transcribed, there's no transcript.
-          const transcript = words.trim();
+          const transcript = (heard || words).trim();
           const n = transcript ? transcript.split(/\s+/).length : 0;
           const pace = read && n ? Math.round(n / Math.max(0.1, read.speaking / 60)) : 0;
           if (!read) {
@@ -164,6 +165,23 @@ export async function record(): Promise<Recording> {
         }
       })),
   };
+}
+
+// Your words, from the server. Empty if it's unavailable or slow; never made up.
+async function transcribe(blob: Blob): Promise<string> {
+  if (!blob.size) return "";
+  const body = new FormData();
+  body.set("file", blob, `answer.${blob.type.includes("webm") ? "webm" : "m4a"}`);
+  const stop = new AbortController();
+  const t = setTimeout(() => stop.abort(), 20000);
+  try {
+    const res = await fetch("/api/transcribe", { method: "POST", body, signal: stop.signal });
+    return res.ok ? (((await res.json()) as { text?: string }).text ?? "") : "";
+  } catch {
+    return "";
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 // Without a microphone (or permission) the prototype records a clearly-labelled sample.

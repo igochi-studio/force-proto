@@ -57,7 +57,7 @@ for (const run of runs) {
   await step("onairos", async () => {
     await tap(page.getByRole("button", { name: "Connect with Onairos" }));
     await page.getByRole("button", { name: "Connected" }).waitFor({ timeout: 4000 });
-    await page.getByText("Sample data until the real Onairos").waitFor({ timeout: 2000 });
+    await page.getByRole("button", { name: "Disconnect" }).waitFor({ timeout: 2000 });
   });
   await step("continue", () => tap(page.getByRole("button", { name: "Continue", exact: true })));
   await step("first question", () => page.getByText("By the end of this residency").waitFor({ timeout: 8000 }));
@@ -107,20 +107,20 @@ for (const run of runs) {
     });
   }
   await step("what you can offer", async () => {
-    await page.getByText("I can help others with").waitFor({ timeout: 8000 });
+    await page.getByText("What could you help other residents with").waitFor({ timeout: 8000 });
     await idle();
     await tap(page.getByRole("button", { name: "Skills", exact: true }));
     await tap(page.getByRole("button", { name: "Done" }));
   });
   await step("what you'd value", async () => {
-    await page.getByText("I would value help with").waitFor({ timeout: 8000 });
+    await page.getByText("And what would you value help with").waitFor({ timeout: 8000 });
     await idle();
     await tap(page.getByRole("button", { name: "Feedback", exact: true }));
     await tap(page.getByRole("button", { name: "Done" }));
   });
   await step("snapshot grows in the chat", async () => {
-    await page.getByText("Putting together what you said").waitFor({ timeout: 8000 });
-    await page.getByRole("button", { name: "Check what Force understood" }).waitFor({ timeout: 14000 });
+    await page.getByText("Intent snapshot").waitFor({ timeout: 8000 });
+    await page.getByRole("button", { name: "Check what Force understood" }).waitFor({ timeout: 60000 });
   });
   await shot("4-snapshot-in-chat");
   await step("open your snapshot", async () => {
@@ -145,12 +145,14 @@ for (const run of runs) {
     await page.getByText("Is this right?").waitFor({ state: "detached", timeout: 3000 });
   });
   await step("correct the intent", async () => {
-    await tap(page.getByRole("button", { name: /^Intent:/ }));
+    // A recording Force couldn't make sense of leaves Intent unknown, which is right; add it.
+    await tap(page.getByRole("button", { name: /^Intent(:|\s+Force doesn)/ }).first());
     await page.getByLabel("Intent, in your words").fill("Ship a memory prototype that five teams use daily.");
     await tap(page.getByRole("button", { name: "Save" }));
     await page.getByText("Ship a memory prototype that five teams use daily.").waitFor({ timeout: 2000 });
   });
-  await step("one next step, with why", () => page.getByText("Why this may help:").waitFor({ timeout: 2000 }));
+  await step("one next step, with why (or a prompt to choose one)", () => page.getByText("Why this may help:").or(page.getByLabel("Your next step")).first().waitFor({ timeout: 2000 }));
+  await step("what Force noticed", () => page.getByText("What Force noticed").first().waitFor({ timeout: 2000 }));
   await step("share is its own choice", async () => {
     const sw = page.getByRole("switch", { name: "Share with the residency" });
     if ((await sw.getAttribute("aria-checked")) !== "false") throw new Error("sharing was on before you chose it");
@@ -168,17 +170,18 @@ for (const run of runs) {
   await shot("8-home-graph");
   await step("a connection, with its reason", async () => {
     await page.getByText("Your connections").waitFor({ timeout: 3000 });
-    await tap(page.getByRole("button", { name: /Meera.*Shared exploration/ }));
+    await page.waitForFunction(() => !document.body.innerText.includes("Force is reading everyone"), null, { timeout: 60000 });
+    await tap(page.getByRole("button", { name: /Suggested by Force/ }).first());
     await page.getByText("Something to explore together").waitFor({ timeout: 3000 });
     await page.getByText("Suggested by Force, not yet reviewed").waitFor({ timeout: 2000 });
   });
   await shot("9-connection");
   await step("message from the connection", async () => {
-    await tap(page.getByRole("button", { name: "Message Meera" }));
+    await tap(page.getByRole("button", { name: /^Message / }));
     await page.getByText("Something to explore together:").first().waitFor({ timeout: 3000 });
-    await page.getByLabel("Message").fill("Would love your question list");
+    await page.getByLabel("Message").fill("Would love to compare notes");
     await page.getByLabel("Message").press("Enter");
-    await page.getByText("interview questions").last().waitFor({ timeout: 5000 });
+    await page.getByText("Would love to compare notes").last().waitFor({ timeout: 5000 });
   });
   await shot("10-thread");
   await step("survives a refresh", async () => {

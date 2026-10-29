@@ -22,6 +22,7 @@ import Glass from "../f/Glass";
 import { I, Logo, Paint, haptic } from "../f/ui";
 import Persona, { useYouWorld } from "./Persona";
 import { LinkList, NameField, OnairosCard } from "./Links";
+import Grow from "./Grow";
 import PatternWorld from "./PatternWorld";
 
 type Step = "splash" | "connect" | "talk";
@@ -37,7 +38,7 @@ function Primary({ children, onClick, disabled }: { children: React.ReactNode; o
 // Steps cross-fade in place: nothing slides, nothing bounces.
 function Screen({ children }: { children: React.ReactNode }) {
   return (
-    <motion.div className="flex min-h-0 flex-1 flex-col" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.22, ease: "easeOut" }}>
+    <motion.div className="flex min-h-0 flex-1 flex-col" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16, ease: "easeOut" }}>
       {children}
     </motion.div>
   );
@@ -54,7 +55,7 @@ export default function ResidencyOnboarding() {
   // The splash moves on by itself once the line has been read.
   useEffect(() => {
     if (!painted || step !== "splash") return;
-    const id = setTimeout(() => setStep("connect"), 1800);
+    const id = setTimeout(() => setStep("connect"), 900);
     return () => clearTimeout(id);
   }, [painted, step]);
 
@@ -65,7 +66,7 @@ export default function ResidencyOnboarding() {
           <Screen key="splash">
             <button type="button" onClick={() => painted && go("connect")} className="flex flex-1 flex-col items-center justify-center px-6 text-center" aria-label="Continue">
               <PaintedMark size={236} onDone={() => setPainted(true)} />
-              <motion.p className="mt-10 max-w-[330px] t-body text-ink-2" initial={{ opacity: 0 }} animate={{ opacity: painted ? 1 : 0 }} transition={{ duration: 0.5 }}>
+              <motion.p className="mt-10 max-w-[330px] t-body text-ink-2" initial={{ opacity: 0 }} animate={{ opacity: painted ? 1 : 0 }} transition={{ duration: 0.3 }}>
                 A companion that builds your longitudinal memory and helps you find your perfect side quest partnerships.
               </motion.p>
             </button>
@@ -135,7 +136,6 @@ function Talk({ onNext }: { onNext: () => void }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false); // finished talking; the clip is on its way
   const [needText, setNeedText] = useState(false); // the recording had no words Force could read
-  const mapped = useRef(false);
   const answers = useRef<string[]>([]);
   const clips = useRef<Clip[]>([]);
   const offer = useRef<string[]>([]);
@@ -159,8 +159,8 @@ function Talk({ onNext }: { onNext: () => void }) {
     started.current = true;
     (async () => {
       const first = name.trim().split(/\s+/)[0];
-      await say(`${first ? `Hi ${first}. ` : ""}Three questions about what you want from the residency. Tap the bubble and talk, or type if you'd rather. About five minutes in all.`, 700);
-      await say(QUESTIONS[0], 1000);
+      await say(`${first ? `Hi ${first}. ` : ""}Three questions about what you want from the residency. Tap the bubble and talk, or type if you'd rather. About five minutes in all.`, 350);
+      await say(QUESTIONS[0], 500);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once
   }, []);
@@ -179,7 +179,7 @@ function Talk({ onNext }: { onNext: () => void }) {
     // Force never fills the gap with words you didn't say.
     if (a.clip && !a.clip.transcript.trim()) {
       setNeedText(true);
-      await say("I kept your recording, but couldn't catch the words on this browser. Could you type a line or two?", 800);
+      await say("I kept your recording, but couldn't catch the words on this browser. Could you type a line or two?", 400);
       return;
     }
     setNeedText(false);
@@ -187,49 +187,50 @@ function Talk({ onNext }: { onNext: () => void }) {
     answers.current = [...answers.current, a.clip ? a.clip.transcript : (a.text ?? "")];
     if (qi + 1 < QUESTIONS.length) {
       setQi(qi + 1);
-      await say(qi === 0 ? "Thank you. Next one." : "Last one.", 700);
-      await say(QUESTIONS[qi + 1], 900);
+      await say(qi === 0 ? "Thank you. Next one." : "Last one.", 350);
+      await say(QUESTIONS[qi + 1], 450);
       return;
     }
     setPhase("offer");
-    await say("That's all three. Two quick optional ones, so the right people can find you.", 800);
-    await say("I can help others with…", 800);
+    await say("That's all three. Two quick ones, both optional, so the right people here can find you.", 400);
+    await say("What could you help other residents with? Tap any that fit, or put it in your own words.", 450);
   };
 
   // What you offer, then what you'd value. Either can be skipped.
   const contributed = async (picked: string[]) => {
     const offering = phase === "offer";
-    if (picked.length) setLines((l) => [...l, { id: `me${l.length}${Date.now()}`, from: "me", text: picked.join(", ") }]);
+    if (picked.length) setLines((l) => [...l, { id: `me${l.length}${Date.now()}`, from: "me", text: `${offering ? "I can help with" : "I'd value"} ${listOf(picked)}` }]);
     if (offering) {
       offer.current = picked;
       setPhase("seek");
-      await say("I would value help with…", 800);
+      await say("And what would you value help with right now?", 400);
       return;
     }
     r.setContribution({ can_offer: offer.current, seeking: picked });
     await draft();
   };
 
+  // The snapshot card goes into the conversation at once and narrates while Force reads.
   const draft = async () => {
     setPhase("reading");
-    if (!mapped.current) await say("Thank you. Give me a moment to put it together.", 700);
+    setLines((l) => (l.some((x) => x.map) ? l : [...l, { id: "map", from: "force", map: true }]));
     r.setAnswers(answers.current, clips.current.filter((c) => c.src));
     await r.synthesize();
     if (useR.getState().synth === "failed") {
       setPhase("failed");
-      await say("I couldn't put that together just now. Try again, or I'll make a plain draft straight from your answers.", 600);
+      await say("I couldn't put that together just now. Try again, or I'll make a plain draft straight from your answers.", 300);
       return;
     }
-    show();
+    keep();
   };
 
-  const show = () => {
-    setLines((l) => (l.some((x) => x.map) ? l : [...l, { id: "map", from: "force", map: true }]));
-    if (mapped.current) return;
-    mapped.current = true;
-    // Your answers are your first moments in memory: recordings as voice notes, typed ones as written.
-    const kept = clips.current.filter((c) => c.src);
-    if (kept.length) f.keepClips(kept);
+  // Your answers are your first moments in memory: recordings as voice notes, typed ones as written.
+  const kept = useRef(false);
+  const keep = () => {
+    if (kept.current) return;
+    kept.current = true;
+    const audio = clips.current.filter((c) => c.src);
+    if (audio.length) f.keepClips(audio);
     f.keepTexts(written.current);
   };
 
@@ -238,7 +239,7 @@ function Talk({ onNext }: { onNext: () => void }) {
   const read = async () => {
     if (told.current) return;
     told.current = true;
-    await say("Here's what I understand so far. Tap it to check each part: keep what's right, fix what isn't. Nothing is shared until you say so.", 1100);
+    await say("Here's what I understand so far. Tap it to check each part: keep what's right, fix what isn't. Nothing is shared until you say so.", 550);
     setPhase("done");
   };
 
@@ -262,7 +263,7 @@ function Talk({ onNext }: { onNext: () => void }) {
           const nextL = lines[i + 1];
           const last = !nextL || nextL.from !== m.from || !!nextL.map;
           return (
-            <motion.li key={m.id} layout="position" className={`flex ${m.from === "me" ? "justify-end" : "justify-start"} ${first || m.map ? "mt-3" : ""}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", duration: 0.4, bounce: 0 }}>
+            <motion.li key={m.id} layout="position" className={`flex ${m.from === "me" ? "justify-end" : "justify-start"} ${first || m.map ? "mt-3" : ""}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", duration: 0.28, bounce: 0 }}>
               {m.map ? (
                 <MapCard onRead={read} onOpen={() => (haptic("soft"), setOpen(true))} />
               ) : m.clip ? (
@@ -295,7 +296,7 @@ function Talk({ onNext }: { onNext: () => void }) {
             <Primary onClick={() => (haptic(), draft())} disabled={typing}>
               Try again
             </Primary>
-            <button type="button" disabled={typing} onClick={() => (haptic(), r.useDraft(), show())} className="press h-11 w-full rounded-full bg-fill t-body font-medium text-ink">
+            <button type="button" disabled={typing} onClick={() => (haptic(), r.useDraft(), keep())} className="press h-11 w-full rounded-full bg-fill t-body font-medium text-ink">
               Use a plain draft from my answers
             </button>
           </div>
@@ -323,12 +324,23 @@ function Talk({ onNext }: { onNext: () => void }) {
   );
 }
 
+// "Skills, An introduction, a mentor" → "skills, an introduction and a mentor"
+const listOf = (xs: string[]) => {
+  const w = xs.map((x) => (/^[A-Z][a-z]/.test(x) && !/^[A-Z][a-z]+[A-Z]/.test(x) ? x[0].toLowerCase() + x.slice(1) : x));
+  return w.length > 1 ? `${w.slice(0, -1).join(", ")} and ${w[w.length - 1]}` : w[0];
+};
+
 // The two optional fields: quick tags you tap on and off, plus a few words of your own.
 function Contribute({ tags, placeholder, disabled, onDone }: { tags: readonly string[]; placeholder: string; disabled: boolean; onDone: (picked: string[]) => void }) {
   const [on, setOn] = useState<string[]>([]);
   const [own, setOwn] = useState("");
   const picked = [...on, ...(own.trim() ? [own.trim()] : [])];
   const flip = (t: string) => (haptic(), setOn((x) => (x.includes(t) ? x.filter((y) => y !== t) : [...x, t])));
+  const done = () => {
+    if (disabled) return;
+    haptic();
+    onDone(picked);
+  };
   return (
     <div className="flex flex-col gap-2" style={{ opacity: disabled ? 0.55 : 1, transition: "opacity 300ms" }}>
       <div className="scroll-row no-scrollbar -mx-4 px-4 pb-1" role="group" aria-label="Quick tags">
@@ -339,16 +351,14 @@ function Contribute({ tags, placeholder, disabled, onDone }: { tags: readonly st
         ))}
       </div>
       <form
-        className="flex min-h-[52px] items-center gap-1 rounded-full bg-paper pl-5 pr-[6px]"
+        className="flex min-h-[52px] items-end gap-1 rounded-[26px] bg-paper py-[6px] pl-5 pr-[6px]"
         style={{ boxShadow: "var(--lift-1)" }}
         onSubmit={(e) => {
           e.preventDefault();
-          if (disabled) return;
-          haptic();
-          onDone(picked);
+          done();
         }}
       >
-        <input value={own} onChange={(e) => setOwn(e.target.value)} placeholder={placeholder} aria-label={placeholder} enterKeyHint="done" className="min-w-0 flex-1 bg-transparent t-body text-ink outline-none placeholder:text-ink-3" />
+        <Grow value={own} onChange={setOwn} onSend={done} placeholder={placeholder} aria-label={placeholder} enterKeyHint="done" />
         <button type="submit" disabled={disabled} onPointerDown={(e) => e.preventDefault()} className={`press h-10 shrink-0 rounded-full px-4 t-label font-medium ${picked.length ? "bg-ink text-paper" : "bg-fill text-ink-2"}`}>
           {picked.length ? "Done" : "Skip"}
         </button>
@@ -357,12 +367,34 @@ function Contribute({ tags, placeholder, disabled, onDone }: { tags: readonly st
   );
 }
 
-// The snapshot, in the conversation, the way the world used to arrive. It grows out from you
-// once the draft is ready; only then does it become something you can open.
+// The snapshot, in the conversation, the way the world used to arrive. It goes in as soon as
+// Force starts reading and says what it's doing; the map grows out from you once the read is
+// back, and only then can you open it.
 function MapCard({ onOpen, onRead }: { onOpen: () => void; onRead: () => void }) {
   const world = useYouWorld();
   const snapshot = useR((s) => s.snapshot);
+  const synth = useR((s) => s.synth);
+  const onairos = useR((s) => s.onairos);
   const [ready, setReady] = useState(false);
+  const [step, setStep] = useState(0);
+  const answers = useR((s) => s.answers);
+  // What Force is doing, with your own words as the receipt.
+  const bit = (k: number) => {
+    const w = (answers[k] ?? "").trim().split(/\s+/).filter(Boolean);
+    return w.length ? `“${w.slice(0, 6).join(" ")}${w.length > 6 ? "…" : ""}”` : "";
+  };
+  const steps = [
+    answers[0] ? `Reading ${bit(0)}` : "Reading your three answers…",
+    answers[1] ? `Finding the problem under ${bit(1)}` : "Finding the problem underneath…",
+    onairos === "on" ? "Putting it next to what Onairos saw…" : "Reading between the lines…",
+    answers[2] ? `Sharpening your open question…` : "Working out what you're really after…",
+    "Writing it down…",
+  ];
+  useEffect(() => {
+    if (snapshot) return;
+    const id = setInterval(() => setStep((x) => Math.min(x + 1, 4)), 2600);
+    return () => clearInterval(id);
+  }, [snapshot]);
   const filled = snapshot ? FIELDS.filter((k) => !isEmpty(snapshot, k)).length : 0;
   return (
     <button type="button" disabled={!ready} onClick={onOpen} className="press block w-full overflow-hidden rounded-[24px] bg-paper text-left disabled:active:scale-100" style={{ boxShadow: "var(--lift-1)" }}>
@@ -370,7 +402,7 @@ function MapCard({ onOpen, onRead }: { onOpen: () => void; onRead: () => void })
         <span className="flex items-center gap-2 t-label font-medium text-ink-2">
           <Paint name="pattern-maps" h={16} /> Intent snapshot
         </span>
-        <span className="grid h-8 w-8 place-items-center rounded-full bg-fill text-ink transition-opacity duration-500" style={{ opacity: ready ? 1 : 0 }} aria-hidden>
+        <span className="grid h-8 w-8 place-items-center rounded-full bg-fill text-ink transition-opacity duration-300" style={{ opacity: ready ? 1 : 0 }} aria-hidden>
           <I.Expand size={14} />
         </span>
       </span>
@@ -380,23 +412,28 @@ function MapCard({ onOpen, onRead }: { onOpen: () => void; onRead: () => void })
           edges={world.edges}
           focus={null}
           interactive={false}
-          onGrown={() => {
-            setReady(true);
-            onRead();
-          }}
+          onGrown={
+            snapshot
+              ? () => {
+                  setReady(true);
+                  onRead();
+                }
+              : undefined
+          }
         />
       </span>
       <span className="block min-h-[68px] px-4 pb-4">
-        {ready ? (
+        {ready && snapshot ? (
           <>
             <span className="block t-body font-semibold text-ink">Here&apos;s what Force understands so far</span>
             <span className="mt-1 block t-label text-ink-3">
-              {filled} of 5 parts filled{filled < 5 ? `, ${5 - filled} for you to add` : ""} · tap to check
+              {snapshot.noticed?.length ? `${snapshot.noticed.length} things Force noticed · ` : ""}
+              {filled < 5 ? `${5 - filled} for you to add · ` : ""}tap to check
             </span>
           </>
         ) : (
           <span className="block pt-2 t-label text-ink-3" aria-live="polite">
-            Putting together what you said…
+            {synth === "failed" ? "Waiting for you…" : steps[step]}
           </span>
         )}
       </span>
@@ -408,7 +445,7 @@ function MapCard({ onOpen, onRead }: { onOpen: () => void; onRead: () => void })
 // conversation; at the bottom, on to the people.
 function YouPage({ onClose, onContinue }: { onClose: () => void; onContinue: () => void }) {
   return (
-    <motion.div className="absolute inset-0 z-[75] bg-canvas" initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%", transition: { type: "spring", duration: 0.4, bounce: 0 } }} transition={{ type: "spring", duration: 0.5, bounce: 0 }} style={{ boxShadow: "var(--lift-2)" }}>
+    <motion.div className="absolute inset-0 z-[75] bg-canvas" initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%", transition: { type: "spring", duration: 0.28, bounce: 0 } }} transition={{ type: "spring", duration: 0.36, bounce: 0 }} style={{ boxShadow: "var(--lift-2)" }}>
       <Persona onBack={onClose} onContinue={onContinue} />
     </motion.div>
   );
@@ -419,20 +456,23 @@ function YouPage({ onClose, onContinue }: { onClose: () => void; onContinue: () 
 function Answer({ disabled, typed = false, onListen, onAnswer }: { disabled: boolean; typed?: boolean; onListen: (el: HTMLElement) => void; onAnswer: (a: { text: string }) => void }) {
   const [typing, setTypingMode] = useState(typed);
   const [text, setText] = useState("");
+  const send = () => {
+    if (!text.trim() || disabled) return;
+    haptic();
+    onAnswer({ text: text.trim() });
+  };
 
   if (typing)
     return (
       <form
-        className="flex min-h-[52px] items-center gap-1 rounded-full bg-paper pl-5 pr-[6px]"
+        className="flex min-h-[52px] items-end gap-1 rounded-[26px] bg-paper py-[6px] pl-5 pr-[6px]"
         style={{ boxShadow: "var(--lift-1)" }}
         onSubmit={(e) => {
           e.preventDefault();
-          if (!text.trim() || disabled) return;
-          haptic();
-          onAnswer({ text: text.trim() });
+          send();
         }}
       >
-        <input value={text} onChange={(e) => setText(e.target.value)} autoFocus placeholder="Type your answer…" aria-label="Your answer" enterKeyHint="send" className="min-w-0 flex-1 bg-transparent t-body text-ink outline-none placeholder:text-ink-3" />
+        <Grow value={text} onChange={setText} onSend={send} autoFocus placeholder="Type your answer…" aria-label="Your answer" enterKeyHint="send" />
         <button type="button" aria-label="Talk instead" onClick={() => setTypingMode(false)} className="press grid h-10 w-10 shrink-0 place-items-center">
           <Glass {...ORB} size={34}>
             <I.Mic size={15} />

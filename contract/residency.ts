@@ -57,6 +57,17 @@ export interface Snapshot {
   status: SnapshotStatus;
   shared: boolean; // a separate choice from approval: connecting a source is not consent to publish
   updated_at: string;
+  // Optional, for the UI. A backend that doesn't send them still works.
+  titles?: { intent?: string; problem?: string }; // two to four words, for map nodes
+  noticed?: Noticed[]; // what Force read between the lines; private to the resident, never in the graph
+  takes?: { intent?: string; problem?: string; current_frontier?: string; approach?: Record<string, string> }; // Force's own take on each part, private
+  source?: "model" | "draft"; // written by the model, or the plain draft from the answers
+}
+
+// One thing Force noticed by putting the sources together, with where each part came from.
+export interface Noticed {
+  text: string;
+  from: string[]; // e.g. "Answer 2", "Onairos: Empathy"
 }
 
 export const FIELDS = ["intent", "problem", "approach", "current_frontier", "contribution"] as const;
@@ -271,6 +282,7 @@ export function synthesize(i: SynthInput, now = new Date()): Snapshot {
     status: "pending_review",
     shared: false,
     updated_at: now.toISOString(),
+    source: "draft",
   };
 }
 

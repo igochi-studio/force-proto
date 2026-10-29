@@ -13,7 +13,8 @@ const EMPTY = { graph: { nodes: [], edges: [] } as Graph, mine: [] as Connection
 
 export function useCohort(): { graph: Graph; mine: Connection[]; failed: boolean } {
   const snapshot = useR((s) => s.snapshot);
-  const local = useMemo(() => (api.live ? null : api.localGraph(snapshot)), [snapshot]);
+  const mine = useR((s) => s.mine);
+  const local = useMemo(() => (api.live ? null : api.localGraph(snapshot, mine)), [snapshot, mine]);
   const [remote, setRemote] = useState<{ v: typeof EMPTY; failed: boolean }>({ v: EMPTY, failed: false });
   useEffect(() => {
     if (!api.live) return;

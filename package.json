@@ -11,6 +11,7 @@
     "test:browsers": "node scripts/browsers.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
     "html2canvas": "^1.4.1",
     "lucide-react": "^1.59.0",
     "modern-screenshot": "^4.7.0",
@@ -18,6 +19,7 @@
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "zod": "^4.6.7",
     "zustand": "^5.0.15"
   },
   "devDependencies": {

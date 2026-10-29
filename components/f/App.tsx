@@ -120,9 +120,9 @@ function Panel() {
           ref={box}
           className="absolute inset-0 z-20 overflow-hidden bg-canvas"
           style={{ transformOrigin: from ? `${from.x}px ${from.y}px` : surfaceOf(stack[0]) === "energy-surface" ? "100% 0%" : "0% 0%", borderRadius: 36 }}
-          initial={{ scale: 0.18, opacity: 0 }}
+          initial={{ scale: 0.5, opacity: 0 }}
           animate={{ scale: 1, opacity: 1, borderRadius: 0 }}
-          exit={{ scale: 0.18, opacity: 0, borderRadius: 36, transition: { type: "spring", duration: 0.38, bounce: 0 } }}
+          exit={{ scale: 0.5, opacity: 0, borderRadius: 36, transition: { type: "spring", duration: 0.26, bounce: 0 } }}
           transition={SPRING.surface}
         >
           {stack.length > 1 && <div className="absolute inset-0 bg-canvas opacity-60" aria-hidden />}

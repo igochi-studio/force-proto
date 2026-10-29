@@ -1,19 +1,21 @@
-// The residency's API, one function per endpoint in the v1.1 contract (§4). With
-// NEXT_PUBLIC_RESIDENCY_API set, each one calls the backend at that address; without it, each
-// runs here on the known-good fixtures, so the whole flow works with no backend at all
-// (fallback rung 3: fixture Onairos + live onboarding and validation + reviewed edges).
+// The residency's API, one function per endpoint in the v1.1 contract (§4). Synthesis and
+// connections run through this app's own routes (app/api/residency/*, the model behind them
+// when there's a key). With NEXT_PUBLIC_RESIDENCY_API set, every call goes to the backend at
+// that address instead. The cohort itself is the known-good fixture until the backend serves
+// it (fallback rung 2: live synthesis + reviewed edges).
 //
 //   POST /api/residency/intent/synthesize    synthesize()
 //   POST /api/residency/intent/approve       approve()
 //   GET  /api/residency/intent/snapshot      the store keeps it (lib/f/residency.ts)
 //   GET  /api/residency/graph                graph()
 //   GET  /api/residency/graph/connection     connectionWith()
+//   POST /api/residency/connections          connections()  (this app's addition)
 //
 // To rehearse the failure paths: ?onairos=fail, ?synth=fail.
 
 import cohort from "@/contract/fixtures/cohort.json";
 import onairosSample from "@/contract/fixtures/onairos-general.json";
-import { normalizeOnairos, personId, projectGraph, suggestConnections, synthesize as localSynth, type Connection, type Graph, type OnairosNormalized, type Snapshot, type SynthInput } from "@/contract/residency";
+import { normalizeOnairos, personId, projectGraph, synthesize as localSynth, visible, type Connection, type Graph, type OnairosNormalized, type Snapshot, type SynthInput } from "@/contract/residency";
 
 const BASE = process.env.NEXT_PUBLIC_RESIDENCY_API?.replace(/\/$/, "") ?? "";
 export const live = !!BASE;
@@ -44,10 +46,17 @@ export async function onairos(raw?: unknown): Promise<OnairosNormalized> {
 }
 
 export async function synthesize(input: SynthInput): Promise<Snapshot> {
-  if (live) return call<Snapshot>("/api/residency/intent/synthesize", input);
-  await wait(1200);
-  if (flag("synth")) throw new Error("Synthesis didn't answer");
-  return localSynth(input);
+  if (flag("synth")) {
+    await wait(1200);
+    throw new Error("Synthesis didn't answer");
+  }
+  return call<Snapshot>("/api/residency/intent/synthesize", input);
+}
+
+// Who you're connected with, once your snapshot is approved and shared.
+export async function connections(me: Snapshot): Promise<Connection[]> {
+  if (!visible(me)) return [];
+  return (await call<{ mine: Connection[] }>("/api/residency/connections", { me })).mine;
 }
 
 // The draft Force can always make from the answers alone, if synthesis is down.
@@ -59,11 +68,10 @@ export async function approve(s: Snapshot, shared: boolean): Promise<Snapshot> {
   return { ...s, status: "approved", shared, updated_at: new Date().toISOString() };
 }
 
-// The cohort graph, with you in it only once you've approved and shared. Your connections are
-// the automated candidates; everyone else's are the reviewed ones.
-export function localGraph(me: Snapshot | null): { graph: Graph; mine: Connection[] } {
+// The cohort graph, with you in it only once you've approved and shared. Your connections
+// come from connections(); everyone else's are the reviewed ones.
+export function localGraph(me: Snapshot | null, mine: Connection[] = []): { graph: Graph; mine: Connection[] } {
   const others = COHORT.filter((s) => s.resident_id !== me?.resident_id);
-  const mine = me ? suggestConnections(me, others) : [];
   const graph = projectGraph(me ? [...others, me] : others, [...REVIEWED, ...mine], (s) => s.intent ?? s.problem ?? "Unknown");
   return { graph, mine };
 }
@@ -75,8 +83,8 @@ export async function graph(me: Snapshot | null): Promise<{ graph: Graph; mine: 
   return { graph: g, mine: g.edges.filter((e): e is Connection => "why_connected" in e && (e.source === pid || e.target === pid)) };
 }
 
-export async function connectionWith(me: Snapshot, resident: string): Promise<Connection | null> {
+export async function connectionWith(mine: Connection[], resident: string): Promise<Connection | null> {
   if (live) return call<Connection | null>(`/api/residency/graph/connection?resident=${encodeURIComponent(resident)}`);
   const pid = personId(resident);
-  return localGraph(me).mine.find((c) => c.source === pid || c.target === pid) ?? null;
+  return mine.find((c) => c.source === pid || c.target === pid) ?? null;
 }

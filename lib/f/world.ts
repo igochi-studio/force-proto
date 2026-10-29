@@ -49,45 +49,66 @@ export function layout(nodes: WNode[], edges: [string, string][]): PNode[] {
   });
 }
 
-// The cohort, Obsidian-style: residents round a ring that faces you (you at the bottom),
-// what each wants to change just inside them, and the themes further in, pulled toward
-// everyone who shares them, so a theme two people share sits between them. It stays facing
-// you, so a small cohort never hides half its people on the far side.
+// The cohort, Obsidian-style: a small force simulation, worked out once. Every node pushes
+// the others away; each link pulls its two ends together, a person to their intent hardest,
+// an intent to its themes a little less, two connected people least. So a theme two people
+// share ends up between them, connected people drift close, and nobody's lines cross the
+// whole map. It lies flat, facing you, so a small cohort never hides anyone round the back.
 export const ORDER_COHORT: Record<NodeKind, number> = { you: 0, person: 0, intent: 1, theme: 2 };
 export function layoutCohort(nodes: WNode[], edges: [string, string][]): PNode[] {
-  const at: Record<string, { a: number; r: number }> = {};
-  const people = [...nodes.filter((n) => n.kind === "you"), ...nodes.filter((n) => n.kind === "person")];
-  people.forEach((n, i) => (at[n.id] = { a: -Math.PI / 2 + (i / Math.max(1, people.length)) * Math.PI * 2, r: 1.08 }));
-  nodes
-    .filter((n) => n.kind === "intent")
-    .forEach((n) => {
-      const pa = edges.find(([, b]) => b === n.id)?.[0];
-      at[n.id] = { a: at[pa ?? ""]?.a ?? 0, r: 0.72 };
-    });
-  const pos: Record<string, V3> = {};
-  const xy = (id: string): [number, number] => [Math.cos(at[id].a) * at[id].r, Math.sin(at[id].a) * at[id].r];
-  const kids: Record<string, number> = {};
-  nodes
-    .filter((n) => n.kind === "theme")
-    .forEach((n) => {
-      const from = edges.filter(([, b]) => b === n.id).map(([a]) => a).filter((a) => at[a]);
-      if (from.length > 1) {
-        const sum = from.map(xy).reduce((s, p) => [s[0] + p[0], s[1] + p[1]], [0, 0]);
-        const l = Math.hypot(sum[0], sum[1]) || 1;
-        const r = Math.min(0.32, l / from.length);
-        pos[n.id] = [(sum[0] / l) * r, (sum[1] / l) * r, 0.42];
-      } else {
-        const pa = from[0] ?? "";
-        const k = (kids[pa] = (kids[pa] ?? 0) + 1);
-        const a = (at[pa]?.a ?? 0) + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.32 - (k === 1 ? 0.32 : 0);
-        pos[n.id] = [Math.cos(a) * 0.46, Math.sin(a) * 0.46, 0.38];
-      }
-    });
-  return nodes.map((n) => {
-    if (pos[n.id]) return { ...n, p: pos[n.id] };
-    const [x, y] = at[n.id] ? xy(n.id) : [0, 0];
-    return { ...n, p: [x, y * 0.92, n.kind === "intent" ? 0.42 : 0.36] };
+  const idx = new Map(nodes.map((n, i) => [n.id, i]));
+  const k = nodes.length;
+  // Start on a ring by kind, in a fixed order, so the same cohort always lands the same way.
+  const pos = nodes.map((n, i) => {
+    const a = (i / Math.max(1, k)) * Math.PI * 2 + (n.kind === "you" ? Math.PI / 2 : 0);
+    const r = n.kind === "theme" ? 0.3 : n.kind === "intent" ? 0.7 : 1;
+    return [Math.cos(a) * r, Math.sin(a) * r];
   });
+  const rest = (a: WNode, b: WNode) => (a.kind === "theme" || b.kind === "theme" ? 0.42 : a.kind === "intent" || b.kind === "intent" ? 0.24 : 0.55);
+  const pull = (a: WNode, b: WNode) => (a.kind === "theme" || b.kind === "theme" ? 0.05 : a.kind === "intent" || b.kind === "intent" ? 0.12 : 0.02);
+  const links = edges.map(([a, b]) => [idx.get(a), idx.get(b)]).filter((e): e is [number, number] => e[0] !== undefined && e[1] !== undefined);
+  for (let it = 0; it < 360; it++) {
+    const heat = 1 - it / 360;
+    const f = pos.map(() => [0, 0]);
+    for (let i = 0; i < k; i++)
+      for (let j = i + 1; j < k; j++) {
+        const dx = pos[i][0] - pos[j][0];
+        const dy = pos[i][1] - pos[j][1];
+        const d2 = Math.max(0.004, dx * dx + dy * dy);
+        const push = 0.012 / d2;
+        f[i][0] += dx * push;
+        f[i][1] += dy * push;
+        f[j][0] -= dx * push;
+        f[j][1] -= dy * push;
+      }
+    for (const [i, j] of links) {
+      const dx = pos[j][0] - pos[i][0];
+      const dy = pos[j][1] - pos[i][1];
+      const d = Math.hypot(dx, dy) || 0.001;
+      const s = (d - rest(nodes[i], nodes[j])) * pull(nodes[i], nodes[j]) * 4;
+      f[i][0] += (dx / d) * s;
+      f[i][1] += (dy / d) * s;
+      f[j][0] -= (dx / d) * s;
+      f[j][1] -= (dy / d) * s;
+    }
+    for (let i = 0; i < k; i++) {
+      // a gentle pull to the middle keeps loners on the map
+      f[i][0] -= pos[i][0] * 0.01;
+      f[i][1] -= pos[i][1] * 0.01;
+      const m = Math.hypot(f[i][0], f[i][1]);
+      const cap = 0.06 * heat + 0.004;
+      const sc = m > cap ? cap / m : 1;
+      pos[i][0] += f[i][0] * sc;
+      pos[i][1] += f[i][1] * sc;
+    }
+  }
+  // Fit it to the frame, centred, a touch wider than tall like the phone's map.
+  const xs = pos.map((p) => p[0]);
+  const ys = pos.map((p) => p[1]);
+  const cx = (Math.max(...xs) + Math.min(...xs)) / 2;
+  const cy = (Math.max(...ys) + Math.min(...ys)) / 2;
+  const span = Math.max(Math.max(...xs) - Math.min(...xs), (Math.max(...ys) - Math.min(...ys)) * 1.1, 0.001);
+  return nodes.map((n, i) => ({ ...n, p: [((pos[i][0] - cx) / span) * 2.3, ((pos[i][1] - cy) / span) * 2.3, 0.4] }));
 }
 
 export interface Camera {
@@ -122,7 +143,7 @@ export const bandOf = (near: number) => (near < 0.4 ? 0 : near < 0.6 ? 1 : 2);
 
 // Grows you first, then what you want, then the themes, then the people. t in seconds.
 export const growth = (kind: NodeKind, t: number, order: Record<NodeKind, number> = ORDER) => {
-  const x = Math.max(0, Math.min(1, (t - 0.1 - order[kind] * 0.55) / 0.8));
+  const x = Math.max(0, Math.min(1, (t - 0.05 - order[kind] * 0.3) / 0.5));
   return 1 - Math.pow(1 - x, 3);
 };
-export const GROWN_AT = 0.1 + 3 * 0.55 + 0.9;
+export const GROWN_AT = 0.05 + 3 * 0.3 + 0.55;

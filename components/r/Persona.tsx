@@ -17,9 +17,10 @@ import { f } from "@/lib/f/store";
 import { r, useR } from "@/lib/f/residency";
 import { otherIn, useCohort } from "@/lib/r/cohort";
 import Nav from "../f/Nav";
-import PatternWorld from "./PatternWorld";
+import MapFrame from "./MapFrame";
 import { LinkList, NameField, OnairosCard } from "./Links";
-import { I, SPRING, haptic } from "../f/ui";
+import Grow from "./Grow";
+import { I, Logo, SPRING, haptic } from "../f/ui";
 
 // ── Your map ──
 export function useYouWorld() {
@@ -33,30 +34,35 @@ const KIND: Record<NodeKind, string> = { you: "You", intent: "Intent & problem",
 
 function YouMap() {
   const world = useYouWorld();
-  const [focus, setFocus] = useState<string | null>(null);
-  const n = world.nodes.find((x) => x.id === focus) ?? null;
-  const links = n ? world.edges.flatMap(([a, b]) => (a === n.id ? [b] : b === n.id ? [a] : [])).map((id) => world.nodes.find((x) => x.id === id)!) : [];
-  const res = n?.person ? residentById(n.person) : null;
   return (
-    <div>
-      <div className="relative h-[300px] overflow-hidden rounded-[28px] bg-paper" style={{ boxShadow: "var(--lift-1)" }}>
-        <PatternWorld nodes={world.nodes} edges={world.edges} focus={focus} onTap={setFocus} />
-        {!n && <span className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-fill px-3 py-[6px] t-meta text-ink-3">Drag to turn · tap a node</span>}
-      </div>
-      <AnimatePresence initial={false} mode="popLayout">
-        {n && (
+    <MapFrame
+      nodes={world.nodes}
+      edges={world.edges}
+      height={300}
+      title="Your map"
+      card={(n, setFocus) => {
+        const links = world.edges.flatMap(([a, b]) => (a === n.id ? [b] : b === n.id ? [a] : [])).map((id) => world.nodes.find((x) => x.id === id)!);
+        const res = n.person ? residentById(n.person) : null;
+        return (
           <motion.div key={n.id} className="mt-2 rounded-[24px] bg-paper p-4" style={{ boxShadow: "var(--lift-1)" }} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.12 } }} transition={SPRING.ui}>
             <div className="flex items-start gap-3">
               <span className="min-w-0 flex-1">
-                <span className="block t-meta text-ink-3">{res ? n.from : KIND[n.kind]}</span>
+                <span className="block t-meta text-ink-3">{res ? n.from : n.id === "frontier" ? "Your open question" : KIND[n.kind]}</span>
                 <span className="mt-[2px] block t-body font-semibold text-ink">{res ? `${res.name} · ${res.work}` : n.label}</span>
-                {n.line && <span className="mt-1 block t-label text-ink-2">{n.line}</span>}
-                {n.from && !res && <span className="mt-1 block t-label text-ink-3">{n.from}</span>}
+                {n.from && !res && <span className="mt-1 block t-meta text-ink-3">{n.from}</span>}
               </span>
               <button type="button" aria-label="Close" onClick={() => setFocus(null)} className="press hit grid h-8 w-8 shrink-0 place-items-center rounded-full bg-fill text-ink">
                 <I.Close size={14} />
               </button>
             </div>
+            {n.line && (
+              <div className="mt-3 rounded-[18px] bg-fill px-4 py-3">
+                <p className="flex items-center gap-[6px] t-meta text-ink-3">
+                  <Logo size={12} /> {res ? "Why you're connected" : n.kind === "you" ? "What Force noticed" : "Force's take"}
+                </p>
+                <p className="mt-1 t-body text-ink">{n.line}</p>
+              </div>
+            )}
             {links.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-[6px]">
                 {links.map((l) => (
@@ -72,9 +78,9 @@ function YouMap() {
               </button>
             )}
           </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+        );
+      }}
+    />
   );
 }
 
@@ -310,6 +316,10 @@ function Tip() {
 function NextStep({ s }: { s: Snapshot }) {
   const n = s.next_step;
   const [edit, setEdit] = useState<string | null>(null);
+  const save = () => {
+    r.writeNextStep(edit ?? "");
+    setEdit(null);
+  };
   if (edit !== null || !n || n.status === "dismissed")
     return (
       <div>
@@ -321,13 +331,12 @@ function NextStep({ s }: { s: Snapshot }) {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            r.writeNextStep(edit ?? "");
-            setEdit(null);
+            save();
           }}
-          className="flex min-h-[52px] items-center gap-2 rounded-full bg-paper pl-5 pr-[6px]"
+          className="flex min-h-[52px] items-end gap-2 rounded-[26px] bg-paper py-[6px] pl-5 pr-[6px]"
           style={{ boxShadow: "var(--lift-1)" }}
         >
-          <input value={edit ?? ""} onChange={(e) => setEdit(e.target.value)} autoFocus={edit !== null} placeholder={n ? "A small step of your own…" : "What one small step would help most?"} aria-label="Your next step" enterKeyHint="done" className="min-w-0 flex-1 bg-transparent t-body text-ink outline-none placeholder:text-ink-3" />
+          <Grow value={edit ?? ""} onChange={setEdit} onSend={save} autoFocus={edit !== null} placeholder={n ? "A small step of your own…" : "What one small step would help most?"} aria-label="Your next step" enterKeyHint="done" />
           {!!edit?.trim() && (
             <button type="submit" aria-label="Save" onPointerDown={(e) => e.preventDefault()} className="press grid h-10 w-10 place-items-center rounded-full bg-ink text-paper">
               <I.Up size={18} />
@@ -411,7 +420,27 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
           From {from.length > 1 ? `${from.slice(0, -1).join(", ")} and ${from.at(-1)}` : from[0]}. Check each part. Nothing is shared until you choose.
         </p>
 
+        {!!s.noticed?.length && (
+          <section className="mt-6">
+            <div className="rounded-[28px] bg-paper p-5" style={{ boxShadow: "var(--lift-1)" }}>
+              <p className="flex items-center gap-2 t-label font-medium text-ink-2">
+                <Logo size={14} /> What Force noticed
+              </p>
+              <ul className="mt-1">
+                {s.noticed.map((x, i) => (
+                  <li key={i} className={`py-3 ${i ? "border-t border-[var(--fill)]" : ""}`}>
+                    <p className="t-body text-ink">{x.text}</p>
+                    <p className="mt-1 t-meta text-ink-3">{x.from.join(" · ")}</p>
+                  </li>
+                ))}
+              </ul>
+              {persona && <p className="mt-1 t-meta text-ink-3">{`Onairos${persona.fixture ? " (sample data)" : ""}: ${coverageLine(persona).replace(/^Based on/, "based on")} A read from a sample, never shared.`}</p>}
+            </div>
+          </section>
+        )}
+
         <section className="mt-8">
+          <H hint="Force wrote these from what you said. Your words win.">The five parts</H>
           <Tip />
           <div className="flex flex-col gap-2">
             {FIELDS.map((k, i) => (
@@ -424,26 +453,6 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
           <H hint="Swipe right to accept, left to dismiss, tap to change it.">A useful next step</H>
           <NextStep s={s} />
         </section>
-
-        {persona && (
-          <section className="mt-8">
-            <H hint="Used only to help find your themes. Never shared, never used to rank anyone.">What Onairos added</H>
-            <div className="rounded-[28px] bg-paper p-5" style={{ boxShadow: "var(--lift-1)" }}>
-              {persona.fixture && <span className="mb-2 inline-block rounded-full bg-fill px-2 py-[2px] t-meta text-ink-2">Sample data</span>}
-              {persona.summary && <p className="t-body text-ink">{persona.summary}</p>}
-              {persona.positive.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-[6px]">
-                  {persona.positive.slice(0, 4).map((t) => (
-                    <span key={t.name} className="rounded-full bg-fill px-3 py-[6px] t-label text-ink">
-                      {t.name}
-                    </span>
-                  ))}
-                </div>
-              )}
-              <p className="mt-3 t-label text-ink-3">{coverageLine(persona)} A guess from a sample, so correct anything above that it got wrong.</p>
-            </div>
-          </section>
-        )}
 
         <section className="mt-8">
           <H>Who sees this</H>

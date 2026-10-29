@@ -9,16 +9,16 @@
 //   Conversations: Force first, then everyone here, open threads on top.
 // Under both, the side quests, as a preview of what comes after the residency.
 
-import { useMemo, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { useMemo } from "react";
+import { motion } from "motion/react";
 import { ART_SRC } from "@/data/mira";
 import { CONNECTION_LABEL, type Connection } from "@/contract/residency";
-import { ME_FACE, RESIDENTS, cohortWorld, residentById, type NodeKind } from "@/data/residency";
+import { ME_FACE, RESIDENTS, cohortWorld, residentById, type NodeKind, type WNode } from "@/data/residency";
 import { f, useF } from "@/lib/f/store";
 import { r, useR } from "@/lib/f/residency";
 import Face from "../f/Face";
 import Glass from "../f/Glass";
-import PatternWorld from "./PatternWorld";
+import MapFrame from "./MapFrame";
 import { otherIn, useCohort } from "@/lib/r/cohort";
 import { I, Logo, SPRING, haptic } from "../f/ui";
 
@@ -116,57 +116,93 @@ function Conversations() {
 
 const KIND: Record<NodeKind, string> = { you: "You", person: "In the residency", intent: "Intent & problem", theme: "Theme & approach" };
 
+// Names in a sentence: "Meera, Zoya and you".
+const names = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}` : (xs[0] ?? ""));
+
 function People() {
   const { graph, mine, failed } = useCohort();
   const me = useR((s) => s.me);
   const snapshot = useR((s) => s.snapshot);
+  const linking = useR((s) => s.linking);
   const world = useMemo(() => cohortWorld(graph, me), [graph, me]);
-  const [focus, setFocus] = useState<string | null>(null);
-  const n = world.nodes.find((x) => x.id === focus) ?? null;
-  const near = n ? world.edges.flatMap(([a, b]) => (a === n.id ? [b] : b === n.id ? [a] : [])).map((id) => world.nodes.find((x) => x.id === id)!).filter(Boolean) : [];
   const inGraph = world.nodes.some((x) => x.kind === "you");
   const residents = world.nodes.filter((x) => x.kind === "person").length;
-  const res = n?.kind === "person" && n.person ? residentById(n.person) : null;
   const connOf = (id: string) => mine.find((c) => otherIn(c, me) === id);
+  const byId = useMemo(() => new Map(world.nodes.map((x) => [x.id, x])), [world]);
+  const around = (id: string) => world.edges.flatMap(([a, b]) => (a === id ? [b] : b === id ? [a] : [])).map((x) => byId.get(x)!).filter(Boolean);
+  const who = (rid?: string) => (rid === me ? "you" : (residentById(rid ?? "")?.name ?? "someone"));
+  // What Force can say about a node by putting the cohort together.
+  const readOf = (n: WNode): { head: string; body: string } | null => {
+    if (n.kind === "theme") {
+      const people = [...new Set(around(n.id).filter((x) => x.kind === "intent").map((x) => who(x.person)))];
+      return { head: "Who works through this", body: people.length > 1 ? `${names(people)} all work through ${n.label.toLowerCase()}.` : `Only ${people[0]} so far.` };
+    }
+    if (n.kind === "intent" && n.person !== me) {
+      const theirs = new Set(around(n.id).filter((x) => x.kind === "theme").map((x) => x.label));
+      const yours = around(`intent_${me}`).filter((x) => x.kind === "theme" && theirs.has(x.label)).map((x) => x.label.toLowerCase());
+      return inGraph ? { head: "Next to yours", body: yours.length ? `You both work through ${names(yours)}.` : "Nothing in common with yours yet, which can be a reason to talk too." } : null;
+    }
+    if (n.kind === "person") {
+      const c = n.person ? connOf(n.person) : undefined;
+      if (c) return { head: "Why you're connected", body: c.why_connected };
+      const intent = around(n.id).find((x) => x.kind === "intent");
+      return intent ? { head: "Working on", body: intent.label } : null;
+    }
+    return null;
+  };
 
   return (
     <div>
-      <div className="relative h-[400px] overflow-hidden rounded-[28px] bg-paper" style={{ boxShadow: "var(--lift-1)" }}>
-        <PatternWorld nodes={world.nodes} edges={world.edges} focus={focus} onTap={setFocus} layout="cohort" />
-        {!n && <span className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-fill px-3 py-[6px] t-meta text-ink-3">Drag to turn · tap a node</span>}
-      </div>
-
-      <AnimatePresence initial={false} mode="popLayout">
-        {n && (
-          <motion.div key={n.id} className="mt-2 rounded-[24px] bg-paper p-4" style={{ boxShadow: "var(--lift-1)" }} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.12 } }} transition={SPRING.ui}>
-            <div className="flex items-start gap-3">
-              <span className="min-w-0 flex-1">
-                <span className="block t-meta text-ink-3">{KIND[n.kind]}</span>
-                <span className="mt-[2px] block t-body font-semibold text-ink">{res ? `${res.name} · ${res.work}` : n.label}</span>
-                {res && connOf(res.id) && <span className="mt-1 block t-label text-ink-2">{connOf(res.id)!.why_connected}</span>}
-                {!res && n.line && <span className="mt-1 block t-label text-ink-2">{n.line}</span>}
-              </span>
-              <button type="button" aria-label="Close" onClick={() => setFocus(null)} className="press hit grid h-8 w-8 shrink-0 place-items-center rounded-full bg-fill text-ink">
-                <I.Close size={14} />
-              </button>
-            </div>
-            {near.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-[6px]">
-                {near.map((l) => (
-                  <button key={l.id} type="button" onClick={() => (haptic(), setFocus(l.id))} className="press hit h-8 max-w-full truncate rounded-full bg-fill px-3 t-label text-ink">
-                    {l.title}
-                  </button>
-                ))}
+      <p className="mb-3 flex items-baseline gap-2 px-1">
+        <span className="t-large text-ink">{residents + (inGraph ? 1 : 0)}</span>
+        <span className="t-body text-ink-3">{inGraph ? `people in the graph, you included${mine.length ? ` · ${mine.length} worth meeting` : ""}` : "residents have shared what they're working on"}</span>
+      </p>
+      <MapFrame
+        nodes={world.nodes}
+        edges={world.edges}
+        layout="cohort"
+        height={400}
+        title="The residency"
+        card={(n, setFocus) => {
+          const res = n.kind === "person" && n.person ? residentById(n.person) : null;
+          const read = readOf(n);
+          return (
+            <motion.div key={n.id} className="mt-2 rounded-[24px] bg-paper p-4" style={{ boxShadow: "var(--lift-1)" }} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.1 } }} transition={SPRING.ui}>
+              <div className="flex items-start gap-3">
+                <span className="min-w-0 flex-1">
+                  <span className="block t-meta text-ink-3">{n.kind === "intent" ? `What ${who(n.person)} want${n.person === me ? "" : "s"} to change` : KIND[n.kind]}</span>
+                  <span className="mt-[2px] block t-body font-semibold text-ink">{res ? `${res.name} · ${res.work}` : n.label}</span>
+                </span>
+                <button type="button" aria-label="Close" onClick={() => setFocus(null)} className="press hit grid h-8 w-8 shrink-0 place-items-center rounded-full bg-fill text-ink">
+                  <I.Close size={14} />
+                </button>
               </div>
-            )}
-            {res && (
-              <button type="button" onClick={() => (haptic(), f.push({ name: "connection", id: res.id }))} className="press pill-ink mt-3 h-11 w-full justify-center t-body font-medium">
-                {connOf(res.id) ? "Why you're connected" : `About ${res.name}`}
-              </button>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+              {read && (
+                <div className="mt-3 rounded-[18px] bg-fill px-4 py-3">
+                  <p className="flex items-center gap-[6px] t-meta text-ink-3">
+                    <Logo size={12} /> {read.head}
+                  </p>
+                  <p className="mt-1 t-body text-ink">{read.body}</p>
+                </div>
+              )}
+              {around(n.id).length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-[6px]">
+                  {around(n.id).map((l) => (
+                    <button key={l.id} type="button" onClick={() => (haptic(), setFocus(l.id))} className="press hit h-8 max-w-full truncate rounded-full bg-fill px-3 t-label text-ink">
+                      {l.title}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {res && (
+                <button type="button" onClick={() => (haptic(), f.push({ name: "connection", id: res.id }))} className="press pill-ink mt-3 h-11 w-full justify-center t-body font-medium">
+                  {connOf(res.id) ? "Why you're connected" : `About ${res.name}`}
+                </button>
+              )}
+            </motion.div>
+          );
+        }}
+      />
 
       {failed && <p className="mt-3 rounded-[24px] bg-fill p-4 t-label text-ink-2">Couldn&apos;t load the latest graph. Showing what Force had; it tries again when your snapshot changes.</p>}
 
@@ -183,7 +219,9 @@ function People() {
       {inGraph && (
         <section className="mt-8">
           <h2 className="mb-3 px-1 t-body text-ink-3">Your connections</h2>
-          {mine.length ? (
+          {linking && !mine.length ? (
+            <p className="rounded-[28px] bg-fill p-5 t-body text-ink-2">Force is reading everyone&apos;s snapshots next to yours…</p>
+          ) : mine.length ? (
             <ul className="flex flex-col gap-2">
               {mine.map((c) => {
                 const p = residentById(otherIn(c, me));
@@ -214,9 +252,7 @@ function People() {
           )}
         </section>
       )}
-      <p className="mt-4 px-1 t-meta text-ink-3">
-        {residents + (inGraph ? 1 : 0)} {residents + (inGraph ? 1 : 0) === 1 ? "person has" : "people have"} approved and shared so far. Only approved, shared snapshots are in the graph.
-      </p>
+      <p className="mt-4 px-1 t-meta text-ink-3">Only approved, shared snapshots are in the graph.</p>
     </div>
   );
 }
