@@ -15,7 +15,7 @@
 
 import cohort from "@/contract/fixtures/cohort.json";
 import onairosSample from "@/contract/fixtures/onairos-general.json";
-import { normalizeOnairos, personId, projectGraph, synthesize as localSynth, visible, type Connection, type Graph, type OnairosNormalized, type Snapshot, type SynthInput } from "@/contract/residency";
+import { normalizeOnairos, personId, projectGraph, synthesize as localSynth, visible, type Connection, type Finding, type Graph, type OnairosNormalized, type Snapshot, type SynthInput } from "@/contract/residency";
 
 const BASE = process.env.NEXT_PUBLIC_RESIDENCY_API?.replace(/\/$/, "") ?? "";
 export const live = !!BASE;
@@ -51,6 +51,11 @@ export async function synthesize(input: SynthInput): Promise<Snapshot> {
     throw new Error("Synthesis didn't answer");
   }
   return call<Snapshot>("/api/residency/intent/synthesize", input);
+}
+
+// What's public about you, only because you said yes.
+export async function footprint(name: string, links: string[]): Promise<{ findings: Finding[]; read: string[] }> {
+  return call("/api/residency/footprint", { consent: true, name, links });
 }
 
 // Who you're connected with, once your snapshot is approved and shared.

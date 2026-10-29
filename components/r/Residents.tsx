@@ -19,6 +19,7 @@ import { r, useR } from "@/lib/f/residency";
 import Face from "../f/Face";
 import Glass from "../f/Glass";
 import MapFrame from "./MapFrame";
+import { Badge } from "./Connection";
 import { otherIn, useCohort } from "@/lib/r/cohort";
 import { I, Logo, SPRING, haptic } from "../f/ui";
 
@@ -128,6 +129,12 @@ function People() {
   const inGraph = world.nodes.some((x) => x.kind === "you");
   const residents = world.nodes.filter((x) => x.kind === "person").length;
   const connOf = (id: string) => mine.find((c) => otherIn(c, me) === id);
+  // Everyone in the graph, the ones Force connected you with first.
+  const people = world.nodes
+    .filter((x) => x.kind === "person" && x.person)
+    .map((x) => residentById(x.person!))
+    .filter((x): x is NonNullable<typeof x> => !!x)
+    .sort((a, b) => Number(!!connOf(b.id)) - Number(!!connOf(a.id)));
   const byId = useMemo(() => new Map(world.nodes.map((x) => [x.id, x])), [world]);
   const around = (id: string) => world.edges.flatMap(([a, b]) => (a === id ? [b] : b === id ? [a] : [])).map((x) => byId.get(x)!).filter(Boolean);
   const who = (rid?: string) => (rid === me ? "you" : (residentById(rid ?? "")?.name ?? "someone"));
@@ -216,42 +223,37 @@ function People() {
         </div>
       )}
 
-      {inGraph && (
-        <section className="mt-8">
-          <h2 className="mb-3 px-1 t-body text-ink-3">Your connections</h2>
-          {linking && !mine.length ? (
-            <p className="rounded-[28px] bg-fill p-5 t-body text-ink-2">Force is reading everyone&apos;s snapshots next to yours…</p>
-          ) : mine.length ? (
-            <ul className="flex flex-col gap-2">
-              {mine.map((c) => {
-                const p = residentById(otherIn(c, me));
-                if (!p) return null;
-                return (
-                  <li key={c.id}>
-                    <button type="button" onClick={() => (haptic(), f.push({ name: "connection", id: p.id }))} className="press flex w-full items-start gap-3 rounded-[28px] bg-paper p-4 text-left" style={{ boxShadow: "var(--lift-1)" }}>
-                      <Face face={p.face} size={44} />
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center gap-2">
-                          <span className="t-body font-medium text-ink">{p.name}</span>
-                          <span className="rounded-full bg-fill px-2 py-[1px] t-meta text-ink-2">{CONNECTION_LABEL[c.type]}</span>
-                        </span>
-                        <span className="mt-1 block t-label text-ink-2">{c.why_connected}</span>
-                        <span className="mt-1 flex items-center gap-[6px] t-meta text-ink-3">
-                          <span className="h-[6px] w-[6px] rounded-full" style={{ background: c.origin === "reviewed" ? "var(--sage-4)" : "var(--grey-300)" }} aria-hidden />
-                          {c.origin === "reviewed" ? "Reviewed" : "Suggested by Force"}
-                        </span>
+      <section className="mt-8">
+        <div className="mb-3 flex items-baseline justify-between px-1">
+          <h2 className="t-body text-ink-3">People here</h2>
+          {inGraph && <span className="t-meta text-ink-3">{linking ? "Force is reading everyone next to you…" : mine.length ? `${mine.length} worth meeting first` : "No clear match yet"}</span>}
+        </div>
+        <ul className="grid grid-cols-2 gap-3">
+          {people.map((p) => {
+            const c = connOf(p.id);
+            return (
+              <li key={p.id} className="flex flex-col rounded-[24px] bg-paper p-3 pt-5" style={{ boxShadow: "var(--lift-1)" }}>
+                <button type="button" onClick={() => (haptic(), f.push({ name: "connection", id: p.id }))} className="press flex flex-1 flex-col items-center text-center" aria-label={`${p.name}${c ? `, ${CONNECTION_LABEL[c.type]}` : ""}`}>
+                  <span className="relative">
+                    <Face face={p.face} size={64} />
+                    {c && (
+                      <span className="absolute -bottom-2 left-1/2 -translate-x-1/2">
+                        <Badge c={c} />
                       </span>
-                      <I.Chevron size={16} className="mt-3 shrink-0 text-ink-4" />
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="rounded-[28px] bg-fill p-5 t-body text-ink-2">No connections yet. Force only suggests one when it can say why, from both people&apos;s snapshots. More residents are sharing through the day.</p>
-          )}
-        </section>
-      )}
+                    )}
+                  </span>
+                  <span className="mt-4 t-body font-semibold text-ink">{p.name}</span>
+                  <span className="mt-[2px] line-clamp-2 t-meta text-ink-3">{p.work}</span>
+                  {c && <span className="mt-2 line-clamp-4 t-label text-ink-2">{c.why_connected}</span>}
+                </button>
+                <button type="button" onClick={() => (haptic(), f.push({ name: "connection", id: p.id, say: true }))} className="press mt-3 h-9 w-full rounded-full bg-fill t-label font-medium text-ink">
+                  Say hi
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
       <p className="mt-4 px-1 t-meta text-ink-3">Only approved, shared snapshots are in the graph.</p>
     </div>
   );

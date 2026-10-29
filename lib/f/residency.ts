@@ -8,7 +8,7 @@
 import { create } from "zustand";
 import type { Clip } from "@/data/mira";
 import type { LinkKind } from "@/data/residency";
-import { visible, type Connection, type Field, type NextStep, type OnairosNormalized, type Snapshot, type SynthInput } from "@/contract/residency";
+import { visible, type Connection, type Field, type Finding, type NextStep, type OnairosNormalized, type Snapshot, type SynthInput, type VoiceSignal } from "@/contract/residency";
 import * as api from "@/lib/r/api";
 
 interface R {
@@ -23,6 +23,9 @@ interface R {
   contribution: { can_offer: string[]; seeking: string[] };
   snapshot: Snapshot | null;
   synth: "idle" | "busy" | "failed";
+  lookup: boolean; // you said yes to Force reading what's public about you
+  footprint: { status: "idle" | "busy" | "done" | "failed"; findings: Finding[]; read: string[] };
+  dropped: string[]; // findings you said weren't you
   mine: Connection[]; // your connections, once you've approved and shared
   linking: boolean; // Force is looking for them
   clips: Clip[]; // your recorded answers, for this visit only (the audio doesn't survive a refresh)
@@ -32,7 +35,7 @@ interface R {
 
 const KEY = "force.residency.v2";
 const id = () => `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-const fresh = (): R => ({ done: false, me: id(), name: "", links: {}, extra: [], onairos: "off", persona: null, answers: [], contribution: { can_offer: [], seeking: [] }, snapshot: null, synth: "idle", mine: [], linking: false, clips: [], tab: "people", tip: false });
+const fresh = (): R => ({ done: false, me: id(), name: "", links: {}, extra: [], onairos: "off", persona: null, answers: [], contribution: { can_offer: [], seeking: [] }, snapshot: null, synth: "idle", lookup: false, footprint: { status: "idle", findings: [], read: [] }, dropped: [], mine: [], linking: false, clips: [], tab: "people", tip: false });
 
 // Decided before anything renders, so there's never a flash of the wrong step.
 const load = (): R => {
@@ -46,7 +49,7 @@ const load = (): R => {
     if (!s) return fresh();
     const o = JSON.parse(s) as Partial<R>;
     // Work that was in flight when the page closed isn't any more.
-    return { ...fresh(), ...o, clips: [], linking: false, onairos: o.onairos === "on" ? "on" : o.onairos === "busy" ? "off" : (o.onairos ?? "off"), synth: o.synth === "busy" ? (o.snapshot ? "idle" : "failed") : (o.synth ?? "idle") };
+    return { ...fresh(), ...o, clips: [], linking: false, footprint: o.footprint?.status === "busy" ? { status: "idle", findings: [], read: [] } : (o.footprint ?? fresh().footprint), onairos: o.onairos === "on" ? "on" : o.onairos === "busy" ? "off" : (o.onairos ?? "off"), synth: o.synth === "busy" ? (o.snapshot ? "idle" : "failed") : (o.synth ?? "idle") };
   } catch {
     return fresh();
   }
@@ -62,9 +65,29 @@ useR.subscribe((s) => {
   } catch {}
 });
 
+// How each recorded answer was said, measured from the recording.
+const voiceOf = (clips: Clip[]): VoiceSignal[] =>
+  clips
+    .map((c) => ({ answer: Number(/Answer (\d)/.exec(c.name)?.[1] ?? 0), secs: c.secs, pace: c.pace, pauses: c.pauses, longest_pause: c.longest }))
+    .filter((v) => v.answer > 0 && v.secs > 2);
+
 const input = (): SynthInput => {
   const s = get();
-  return { resident_id: s.me, name: s.name, answers: s.answers, contribution: s.contribution, onairos: s.persona };
+  const kept = s.footprint.findings.filter((x) => !s.dropped.includes(x.id));
+  return { resident_id: s.me, name: s.name, answers: s.answers, contribution: s.contribution, onairos: s.persona, public: kept.length ? kept : undefined, voice: voiceOf(s.clips) };
+};
+
+// Reading what's public runs while you answer; synthesis waits for it, but not for long.
+let reading: Promise<void> | null = null;
+const readPublic = () => {
+  const s = get();
+  if (!s.lookup || !s.name.trim() || s.footprint.status === "busy") return;
+  set({ footprint: { status: "busy", findings: [], read: [] }, dropped: [] });
+  const links = [...Object.values(s.links), ...s.extra].filter((l): l is string => !!l?.trim());
+  reading = api
+    .footprint(s.name, links)
+    .then((f) => set({ footprint: { status: "done", ...f } }))
+    .catch(() => set({ footprint: { status: "failed", findings: [], read: [] } }));
 };
 
 // Who you're connected with follows what you've approved and shared, and nothing else.
@@ -124,6 +147,7 @@ export const r = {
   // Answers in: Force drafts the snapshot. A failure leaves a way on, never a spinner.
   async synthesize() {
     set({ synth: "busy" });
+    if (reading && get().footprint.status === "busy") await Promise.race([reading, new Promise((r) => setTimeout(r, 30000))]);
     try {
       const snap = await api.synthesize(input());
       set({ snapshot: snap, synth: "idle" });
@@ -175,6 +199,17 @@ export const r = {
   },
   setTab(tab: R["tab"]) {
     set({ tab });
+  },
+  setLookup(v: boolean) {
+    set({ lookup: v });
+    if (!v) set({ footprint: { status: "idle", findings: [], read: [] }, dropped: [] });
+  },
+  readPublic,
+  dropFinding(id: string) {
+    set((s) => ({ dropped: [...s.dropped, id] }));
+  },
+  undoDrop() {
+    set((s) => ({ dropped: s.dropped.slice(0, -1) }));
   },
   startOver() {
     set(fresh());

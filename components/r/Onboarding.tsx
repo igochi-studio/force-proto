@@ -21,7 +21,7 @@ import { AudioBubble, Bubble, Typing } from "../f/Bubbles";
 import Glass from "../f/Glass";
 import { I, Logo, Paint, haptic } from "../f/ui";
 import Persona, { useYouWorld } from "./Persona";
-import { LinkList, NameField, OnairosCard } from "./Links";
+import { LinkList, LookupCard, NameField, OnairosCard } from "./Links";
 import Grow from "./Grow";
 import PatternWorld from "./PatternWorld";
 
@@ -74,7 +74,12 @@ export default function ResidencyOnboarding() {
         )}
         {step === "connect" && (
           <Screen key="connect">
-            <Connect onNext={() => go("talk")} />
+            <Connect
+              onNext={() => {
+                r.readPublic();
+                go("talk");
+              }}
+            />
           </Screen>
         )}
         {step === "talk" && (
@@ -104,11 +109,12 @@ function Connect({ onNext }: { onNext: () => void }) {
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-6">
         <header className="px-1 pb-6 pt-10">
           <h1 className="t-large text-ink">Connect what&apos;s yours</h1>
-          <p className="mt-2 t-body text-ink-3">Your name, and Onairos if you&apos;d like. Links are optional: they sit on your card for the residents you connect with.</p>
+          <p className="mt-2 t-body text-ink-3">Your name, then as much as you&apos;d like Force to know before you talk. All of it is optional.</p>
         </header>
 
         <NameField />
-        <LinkList className="mt-6" />
+        <LookupCard className="mt-6" />
+        <LinkList className="mt-2" />
         <OnairosCard className="mt-6" />
       </div>
       <div className="shrink-0 px-4 pb-3 pt-2">
@@ -159,7 +165,8 @@ function Talk({ onNext }: { onNext: () => void }) {
     started.current = true;
     (async () => {
       const first = name.trim().split(/\s+/)[0];
-      await say(`${first ? `Hi ${first}. ` : ""}Three questions about what you want from the residency. Tap the bubble and talk, or type if you'd rather. About five minutes in all.`, 350);
+      const looking = useR.getState().footprint.status === "busy";
+      await say(`${first ? `Hi ${first}. ` : ""}Three questions about what you want from the residency. Tap the bubble and talk, or type if you'd rather. About five minutes in all.${looking ? " While we talk, I'm reading what's public about you." : ""}`, 350);
       await say(QUESTIONS[0], 500);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once
@@ -378,6 +385,7 @@ function MapCard({ onOpen, onRead }: { onOpen: () => void; onRead: () => void })
   const [ready, setReady] = useState(false);
   const [step, setStep] = useState(0);
   const answers = useR((s) => s.answers);
+  const footprint = useR((s) => s.footprint);
   // What Force is doing, with your own words as the receipt.
   const bit = (k: number) => {
     const w = (answers[k] ?? "").trim().split(/\s+/).filter(Boolean);
@@ -386,7 +394,7 @@ function MapCard({ onOpen, onRead }: { onOpen: () => void; onRead: () => void })
   const steps = [
     answers[0] ? `Reading ${bit(0)}` : "Reading your three answers…",
     answers[1] ? `Finding the problem under ${bit(1)}` : "Finding the problem underneath…",
-    onairos === "on" ? "Putting it next to what Onairos saw…" : "Reading between the lines…",
+    footprint.read.length ? `Putting it next to ${footprint.read.slice(0, 2).join(" and ")}…` : onairos === "on" ? "Putting it next to what Onairos saw…" : "Reading between the lines…",
     answers[2] ? `Sharpening your open question…` : "Working out what you're really after…",
     "Writing it down…",
   ];

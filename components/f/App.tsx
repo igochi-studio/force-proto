@@ -50,7 +50,7 @@ function Page({ s }: { s: Screen }) {
     case "persona":
       return <Persona />;
     case "connection":
-      return <ConnectionPage id={s.id} />;
+      return <ConnectionPage id={s.id} say={s.say} />;
   }
 }
 

@@ -42,8 +42,10 @@ type Bead = { x: number; y: number; r: number; art: Art; band: number };
 export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, interactive = true, layout: mode = "you" }: { nodes: WNode[]; edges: [string, string][]; focus: string | null; onTap?: (id: string | null) => void; onGrown?: () => void; interactive?: boolean; layout?: "you" | "cohort" }) {
   const cv = useRef<HTMLCanvasElement>(null);
   const props = useRef({ focus, onTap, onGrown });
+  const wake = useRef<() => void>(() => {});
   useEffect(() => {
     props.current = { focus, onTap, onGrown };
+    wake.current(); // a new focus is a reason to draw
   });
   const cam = useRef<Camera & { vy: number; vp: number; idleAt: number }>({ yaw: 0, pitch: 0.12, zoom: 1, vy: 0, vp: 0, idleAt: 0 });
   const sig = nodes.map((n) => n.id + n.title).join("|") + edges.join("|");
@@ -52,7 +54,17 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
     const canvas = cv.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
-    (Object.keys(ART_SRC) as Art[]).forEach(painting);
+    // Drawn only while something moves: growing, a drag and its glide, a new focus. A still
+    // map costs nothing (constant redraws also upset text rendering in some browsers).
+    let lastFoc: string | null | undefined;
+    const kick = () => {
+      if (alive && !raf && shown && !document.hidden) raf = requestAnimationFrame(draw);
+    };
+    wake.current = kick;
+    (Object.keys(ART_SRC) as Art[]).forEach((a) => {
+      const img = painting(a);
+      if (!img.complete) img.addEventListener("load", () => kick(), { once: true });
+    });
     const world = mode === "cohort" ? layoutCohort(nodes, edges) : layout(nodes, edges);
     const order = mode === "cohort" ? ORDER_COHORT : undefined;
     const byId = new Map(world.map((n) => [n.id, n]));
@@ -78,7 +90,7 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
       canvas.height = Math.round(H * dpr);
     };
     size();
-    const ro = new ResizeObserver(size);
+    const ro = new ResizeObserver(() => (size(), kick()));
     ro.observe(canvas);
     const layer = document.createElement("canvas");
     const lctx = layer.getContext("2d")!;
@@ -99,7 +111,6 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
       C.pitch = Math.max(-1, Math.min(1, C.pitch + C.vp));
       C.vy *= 0.94;
       C.vp *= 0.94;
-      if (!reduce && !dragging && now - C.idleAt > 1800 && !props.current.focus && mode !== "cohort") C.vy += (0.0018 - C.vy) * 0.03;
       if (!told && (reduce || t > GROWN_AT)) {
         told = true;
         props.current.onGrown?.();
@@ -262,9 +273,10 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
           ctx.fillText(l.text, best.x, best.y);
         });
       ctx.globalAlpha = 1;
-      // A map you can't touch settles once it has grown: one still frame, nothing running.
-      if (!interactive && told) return;
-      raf = requestAnimationFrame(draw);
+      // Keep going only while something is moving; otherwise rest on this frame.
+      const moving = !told || dragging || Math.abs(C.vy) > 0.0003 || Math.abs(C.vp) > 0.0003 || foc !== lastFoc;
+      lastFoc = foc;
+      raf = moving && (interactive || !told) ? requestAnimationFrame(draw) : 0;
     };
 
     // ── Touch: drag to turn, tap a node ──
@@ -294,6 +306,7 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
       C.idleAt = Infinity;
       start = { ...p, moved: false };
       last = { ...p, t: e.timeStamp };
+      kick();
     };
     const move = (e: PointerEvent) => {
       if (!dragging || !start) return;
@@ -342,7 +355,8 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
     }
     const resume = () => {
       cancelAnimationFrame(raf);
-      if (shown && !document.hidden) raf = requestAnimationFrame(draw);
+      raf = 0;
+      kick();
     };
     document.addEventListener("visibilitychange", resume);
     const io = new IntersectionObserver(([e]) => {
@@ -350,7 +364,7 @@ export default function PatternWorld({ nodes, edges, focus, onTap, onGrown, inte
       resume();
     });
     io.observe(canvas);
-    raf = requestAnimationFrame(draw);
+    kick();
     return () => {
       alive = false;
       cancelAnimationFrame(raf);

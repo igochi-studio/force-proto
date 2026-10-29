@@ -36,7 +36,7 @@ export type Screen =
   | { name: "profile" }
   | { name: "force" } // the residency: talking to Force, opened from the conversations
   | { name: "persona" } // the residency: who Force thinks you are
-  | { name: "connection"; id: string }; // the residency: why you and a resident are connected
+  | { name: "connection"; id: string; say?: boolean }; // the residency: a resident's page; say opens the drafted hello
 
 export interface Sheet {
   key: number;

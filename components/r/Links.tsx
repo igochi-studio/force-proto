@@ -106,6 +106,39 @@ export function LinkList({ className = "" }: { className?: string }) {
   );
 }
 
+// Your say-so for Force to look you up, the way a friend might before meeting you: your name
+// and the links you add, public pages only. Off until you turn it on.
+export function LookupCard({ className = "" }: { className?: string }) {
+  const on = useR((s) => s.lookup);
+  return (
+    <div className={`rounded-[28px] bg-paper p-5 ${className}`} style={{ boxShadow: "var(--lift-1)" }}>
+      <div className="flex items-center gap-3">
+        <span className="min-w-0 flex-1">
+          <span className="block t-body font-semibold text-ink">Let Force look you up</span>
+          <span className="mt-1 block t-label text-ink-3">It reads what&apos;s public under your name and links, so it meets you already knowing a little.</span>
+        </span>
+        <button type="button" role="switch" aria-checked={on} aria-label="Let Force look you up" onClick={() => (haptic(), r.setLookup(!on))} className={`relative h-8 w-[52px] shrink-0 rounded-full transition-colors duration-200 ${on ? "bg-ink" : "bg-[var(--grey-300)]"}`}>
+          <span className="absolute top-1 h-6 w-6 rounded-full bg-paper transition-[left] duration-200" style={{ left: on ? 24 : 4, boxShadow: "0 1px 3px rgb(28 27 26 / 0.2)" }} />
+        </button>
+      </div>
+      <dl className="mt-4 flex flex-col gap-2 t-label">
+        <div>
+          <dt className="inline font-medium text-ink">What it reads: </dt>
+          <dd className="inline text-ink-2">public pages only, from a search of your name and the links below. Never your inbox or accounts.</dd>
+        </div>
+        <div>
+          <dt className="inline font-medium text-ink">What you see: </dt>
+          <dd className="inline text-ink-2">every finding with its sources. Remove anything that isn&apos;t you.</dd>
+        </div>
+        <div>
+          <dt className="inline font-medium text-ink">Who sees it: </dt>
+          <dd className="inline text-ink-2">only you. It shapes your snapshot; it never goes to the residency on its own.</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
 // Before anything connects: what's read, what Force takes from it, what it keeps, and why.
 export function OnairosCard({ className = "" }: { className?: string }) {
   const onairos = useR((s) => s.onairos);

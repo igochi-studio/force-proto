@@ -193,6 +193,26 @@ export interface SynthInput {
   answers: [string, string, string] | string[];
   contribution: { can_offer: string[]; seeking: string[] };
   onairos: OnairosNormalized | null;
+  public?: Finding[]; // what the resident let Force read about them online, minus what they removed
+  voice?: VoiceSignal[]; // how each recorded answer was said
+}
+
+// What Force found about you in public, with its sources. Only with your say-so, only what
+// you keep, private to you: it can shape your snapshot but never goes into the graph itself.
+export interface Finding {
+  id: string;
+  label: string; // "Known for", "Makes", "Writes about", "Into"…
+  text: string;
+  sources: { title: string; url: string }[];
+}
+
+// Measured from the recording itself, never inferred: length, pace, pauses.
+export interface VoiceSignal {
+  answer: number; // 1–3
+  secs: number;
+  pace: number; // words a minute while speaking, 0 if unknown
+  pauses: number;
+  longest_pause: number; // seconds
 }
 
 // The first sentence or two, at most ~28 words, in the person's own words.
@@ -292,6 +312,14 @@ export type NodeType = "person" | "intent_problem" | "theme_approach";
 export type StructuralEdge = "person_has_intent" | "intent_has_theme";
 export type ConnectionType = "shared_problem" | "complementary_approach" | "shared_exploration" | "potential_contribution";
 
+// Short badges for people cards, Gigi-style, each with its colour.
+export const CONNECTION_BADGE: Record<ConnectionType, { label: string; hue: "rose" | "sage" | "sky" | "amber" }> = {
+  shared_problem: { label: "Same problem", hue: "rose" },
+  complementary_approach: { label: "Complements you", hue: "sage" },
+  shared_exploration: { label: "Same question", hue: "sky" },
+  potential_contribution: { label: "Can help", hue: "amber" },
+};
+
 export const CONNECTION_LABEL: Record<ConnectionType, string> = {
   shared_problem: "Shared problem",
   complementary_approach: "Complementary approach",
@@ -323,6 +351,7 @@ export interface Connection {
   evidence: Evidence[];
   origin: "reviewed" | "automated"; // the demo tells these apart
   reviewed_by?: string;
+  opener?: string; // a first message you could send, drafted by Force; never sent by itself
 }
 
 export type GraphEdge = { source: string; target: string; type: StructuralEdge } | (Connection & { type: ConnectionType });

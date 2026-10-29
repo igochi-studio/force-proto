@@ -11,14 +11,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, useTransform } from "motion/react";
-import { CONNECTION_LABEL, FIELDS, FIELD_LABEL, FIELD_MEANING, OFFER_TAGS, SEEK_TAGS, coverageLine, isEmpty, type Field, type Snapshot } from "@/contract/residency";
+import { CONNECTION_LABEL, FIELDS, QUESTIONS, FIELD_LABEL, FIELD_MEANING, OFFER_TAGS, SEEK_TAGS, coverageLine, isEmpty, type Field, type Snapshot } from "@/contract/residency";
 import { residentById, youWorld, type NodeKind } from "@/data/residency";
 import { f } from "@/lib/f/store";
 import { r, useR } from "@/lib/f/residency";
 import { otherIn, useCohort } from "@/lib/r/cohort";
 import Nav from "../f/Nav";
 import MapFrame from "./MapFrame";
-import { LinkList, NameField, OnairosCard } from "./Links";
+import { LinkList, LookupCard, NameField, OnairosCard } from "./Links";
+import { AudioBubble } from "../f/Bubbles";
 import Grow from "./Grow";
 import { I, Logo, SPRING, haptic } from "../f/ui";
 
@@ -366,6 +367,111 @@ function NextStep({ s }: { s: Snapshot }) {
   );
 }
 
+// ── What Force found about you ──
+// Scoops, the way Gigi shows a person: a label, what was found, and where. Each is yours to
+// remove; only what you keep shapes your snapshot, and none of it goes to the residency.
+const host = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+};
+
+function Found() {
+  const { lookup, footprint, dropped } = useR();
+  if (!lookup) return null;
+  if (footprint.status === "idle")
+    return (
+      <section className="mt-8">
+        <H>What Force found about you</H>
+        <button type="button" onClick={() => (haptic(), r.readPublic())} className="press h-11 w-full rounded-full bg-fill t-body font-medium text-ink">
+          Look me up now
+        </button>
+      </section>
+    );
+  const kept = footprint.findings.filter((x) => !dropped.includes(x.id));
+  return (
+    <section className="mt-8">
+      <H hint={footprint.read.length ? `Read: ${footprint.read.join(" · ")}` : undefined}>What Force found about you</H>
+      {footprint.status === "busy" ? (
+        <p className="rounded-[28px] bg-fill p-5 t-body text-ink-2">Still reading what&apos;s public about you…</p>
+      ) : footprint.status === "failed" ? (
+        <div className="rounded-[28px] bg-fill p-5">
+          <p className="t-body text-ink-2">Couldn&apos;t read what&apos;s public just now.</p>
+          <button type="button" onClick={() => (haptic(), r.readPublic())} className="press mt-3 h-10 rounded-full bg-paper px-4 t-label font-medium text-ink" style={{ boxShadow: "var(--lift-1)" }}>
+            Try again
+          </button>
+        </div>
+      ) : !footprint.findings.length ? (
+        <p className="rounded-[28px] bg-fill p-5 t-body text-ink-2">Nothing public Force could tie to you with confidence, so it kept nothing.</p>
+      ) : (
+        <>
+          <ul className="scroll-row no-scrollbar -mx-4 gap-2 px-4 pb-2" aria-label="What Force found">
+            <AnimatePresence initial={false}>
+              {kept.map((x) => (
+                <motion.li key={x.id} layout exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }} transition={SPRING.move} className="flex w-[264px] shrink-0 flex-col rounded-[24px] bg-paper p-4" style={{ boxShadow: "var(--lift-1)" }}>
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="t-meta uppercase text-ink-3">{x.label}</span>
+                    <button type="button" aria-label="Not me, remove" onClick={() => (haptic("soft"), r.dropFinding(x.id))} className="press hit -mr-1 -mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-fill text-ink-3">
+                      <I.Close size={12} />
+                    </button>
+                  </div>
+                  <p className="mt-2 flex-1 t-body text-ink">{x.text}</p>
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className="flex -space-x-1">
+                      {x.sources.slice(0, 3).map((src) => (
+                        <a key={src.url} href={src.url} target="_blank" rel="noreferrer" aria-label={src.title} className="grid h-6 w-6 place-items-center rounded-full bg-fill t-meta font-medium uppercase text-ink-2 ring-2 ring-[var(--paper)]">
+                          {host(src.url)[0]}
+                        </a>
+                      ))}
+                    </span>
+                    <span className="truncate t-meta text-ink-3">
+                      {x.sources.length === 1 ? host(x.sources[0].url) : `${x.sources.length} sources`}
+                    </span>
+                  </div>
+                </motion.li>
+              ))}
+            </AnimatePresence>
+          </ul>
+          {dropped.length > 0 && (
+            <button type="button" onClick={() => r.undoDrop()} className="press flex h-11 items-center px-2 t-label text-ink-3">
+              {dropped.length} not you · <span className="ml-1 font-medium text-ink-2">Undo</span>
+            </button>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+// ── Your answers, to hear again ──
+function Answers() {
+  const { answers, clips } = useR();
+  if (!answers.length) return null;
+  return (
+    <section className="mt-8">
+      <H hint="What you said, the way you said it.">Your answers</H>
+      <ul className="flex flex-col gap-2">
+        {QUESTIONS.map((q, i) => {
+          const clip = clips.find((c) => c.name === `Answer ${i + 1}`);
+          return (
+            <li key={i} className="rounded-[24px] bg-paper p-4" style={{ boxShadow: "var(--lift-1)" }}>
+              <p className="t-meta text-ink-3">{q}</p>
+              {clip ? (
+                <div className="mt-2">
+                  <AudioBubble clip={clip} />
+                </div>
+              ) : null}
+              {answers[i] && <p className="mt-2 t-body text-ink">{answers[i]}</p>}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 // iOS switch, the same as on your profile.
 function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
@@ -439,6 +545,8 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
           </section>
         )}
 
+        <Found />
+
         <section className="mt-8">
           <H hint="Force wrote these from what you said. Your words win.">The five parts</H>
           <Tip />
@@ -453,6 +561,8 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
           <H hint="Swipe right to accept, left to dismiss, tap to change it.">A useful next step</H>
           <NextStep s={s} />
         </section>
+
+        <Answers />
 
         <section className="mt-8">
           <H>Who sees this</H>
@@ -490,8 +600,9 @@ export default function Persona({ onBack, onContinue }: { onBack?: () => void; o
         </section>
 
         <section className="mt-8">
-          <H hint="Optional. Shown on your card to residents you connect with. Force doesn't read them.">Where people can find you</H>
+          <H hint="Optional. Force reads these only if you let it look you up.">Where people can find you</H>
           <NameField />
+          <LookupCard className="mt-2" />
           <LinkList className="mt-2" />
           <OnairosCard className="mt-2" />
         </section>

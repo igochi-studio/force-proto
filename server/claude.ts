@@ -8,7 +8,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
-import { QUESTIONS, type Connection, type ConnectionType, type Field, type Snapshot, type SynthInput } from "@/contract/residency";
+import { QUESTIONS, type Connection, type ConnectionType, type Field, type Finding, type Snapshot, type SynthInput } from "@/contract/residency";
 
 const MODEL = "claude-opus-5-5";
 export const hasClaude = () => !!process.env.ANTHROPIC_API_KEY;
@@ -86,6 +86,8 @@ export async function readSnapshot(i: SynthInput, base: Snapshot, themes: string
     o
       ? `Onairos (an inference from a ${o.coverage.label ?? "partial"} sample of their apps, not fact):\nSummary: ${o.summary ?? "none"}\nStrengths: ${o.positive.map((t) => `${t.name}${t.evidence ? ` (${t.evidence})` : ""}`).join("; ") || "none"}\nSuggestions: ${o.nudges.join(" | ") || "none"}`
       : "Onairos: not connected.",
+    i.public?.length ? `What's public about them, which they asked Force to read (an outside view; use it to understand them, quote it only through "noticed" sources like "Public: GitHub"):\n${i.public.map((f) => `- ${f.label}: ${f.text} (${f.sources.map((x) => x.title).join(", ")})`).join("\n")}` : "",
+    i.voice?.length ? `How they said it (measured from their recordings; mention only a clear difference between answers, sourced like "Voice: answer 3"):\n${i.voice.map((v) => `- Answer ${v.answer}: ${Math.round(v.secs)}s, ${v.pace ? `${v.pace} words a minute` : "pace unknown"}, ${v.pauses} pauses, longest ${v.longest_pause.toFixed(1)}s`).join("\n")}` : "",
     themes.length ? `Approach names other residents already use (reuse one exactly when it genuinely fits; otherwise name your own): ${themes.join(", ")}` : "",
   ].filter(Boolean);
   const out = await ask(SnapshotOut, `${FORCE}\n\n${SNAPSHOT_TASK}`, `Resident: ${i.name || "unnamed"}\n\n${parts.join("\n\n")}`);
@@ -133,6 +135,7 @@ const ConnectionsOut = z.object({
       what_to_explore: z.string(),
       your_evidence: z.object({ field: z.enum(FIELDS), text: z.string() }),
       their_evidence: z.object({ field: z.enum(FIELDS), text: z.string() }),
+      opener: z.string(),
     }),
   ),
 });
@@ -145,7 +148,7 @@ For the resident you're writing to ("you"), look at each other resident and conn
 - shared_exploration: they're actively exploring a related open question.
 - potential_contribution: one person's explicitly stated offer may meet the other's explicitly stated need.
 
-Rules: at most three connections, strongest first. Zero is a good answer when nothing is clear; never connect people just to fill the list. why_connected: one sentence of 8 to 20 words, addressed to "you", naming what you and they share in plain words. what_to_explore: one question the two of them could talk through. Evidence: for each side, the field it comes from and a short quote (at most 16 words) close to that snapshot's own words.`;
+Rules: at most three connections, strongest first. Zero is a good answer when nothing is clear; never connect people just to fill the list. why_connected: one sentence of 8 to 20 words, addressed to "you", naming what you and they share in plain words. what_to_explore: one question the two of them could talk through. Evidence: for each side, the field it comes from and a short quote (at most 16 words) close to that snapshot's own words. opener: the first message "you" could send them, in a resident's own casual voice, at most 40 words: name the specific thing you share, then one small, concrete ask (ten minutes, a coffee, one question). No greetings like "I hope you're well", no flattery.`;
 
 const view = (s: Snapshot) =>
   `id: ${s.resident_id}\nname: ${s.name}\nintent: ${s.intent ?? "unknown"}\nproblem: ${s.problem ?? "unknown"}\napproach: ${s.approach.join(", ") || "unknown"}\ncurrent_frontier: ${s.current_frontier ?? "unknown"}\ncan offer: ${s.contribution.can_offer.join(", ") || "none"}\nseeking: ${s.contribution.seeking.join(", ") || "none"}`;
@@ -172,6 +175,63 @@ export async function readConnections(me: Snapshot, others: Snapshot[]): Promise
           { snapshot_id: o.id, field: c.their_evidence.field as Field, text: c.their_evidence.text },
         ],
         origin: "automated" as const,
+        opener: c.opener.trim(),
       };
     });
+}
+
+// ── What's public about you ──
+// Only when the resident has said yes, only from public pages, and only what can be tied to
+// them with confidence. Every finding carries its sources so they can check it and remove it.
+
+const FootprintOut = z.object({
+  findings: z.array(
+    z.object({
+      label: z.string(),
+      text: z.string(),
+      sources: z.array(z.object({ title: z.string(), url: z.string() })),
+    }),
+  ),
+  read: z.array(z.string()),
+});
+
+const FOOTPRINT_TASK = `The resident has asked Force to read what's public about them, so it can understand them better before the residency. Use web search and web fetch.
+
+1. Start from the links they gave. Fetch them; if a site blocks fetching (LinkedIn and X often do), use what search results show about that page.
+2. Then search their name together with details from those pages, to find talks, articles, interviews, projects, things they've made, and tastes they've shared publicly (writing, Substack, Goodreads, Letterboxd, a portfolio).
+3. Keep only what you're confident is this same person. When in doubt, leave it out.
+4. Never include private details even if you find them: home address, phone, email, family, finances, health, or anything about purchases.
+
+Return three to six findings, each with a short label (such as "Known for", "Background", "Makes", "Writes about", "Into", "Recently"), one or two sentences written to them in second person, and the sources it came from (page title and URL). In "read", list up to six places you actually read, each one to three words with no explanation (for example "igochi.studio", "GitHub", "2 articles"). If nothing can be confidently tied to them, return no findings.`;
+
+export async function readFootprint(name: string, links: string[]): Promise<{ findings: Finding[]; read: string[] }> {
+  const user = `Name: ${name}\nLinks they gave:\n${links.length ? links.map((l) => `- ${l}`).join("\n") : "- none"}`;
+  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: user }];
+  for (let turn = 0; turn < 4; turn++) {
+    const res = await client().beta.messages.parse({
+      model: MODEL,
+      max_tokens: 16000,
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      output_config: { effort: "medium", format: betaZodOutputFormat(FootprintOut) },
+      system: `${FORCE}\n\n${FOOTPRINT_TASK}`,
+      tools: [
+        { type: "web_search_20260209", name: "web_search", max_uses: 6 },
+        { type: "web_fetch_20260209", name: "web_fetch", max_uses: 6 },
+      ],
+      messages,
+    });
+    if (res.stop_reason === "pause_turn") {
+      messages.push({ role: "assistant", content: res.content });
+      continue;
+    }
+    if (res.stop_reason === "refusal") throw new Error("declined");
+    const out = res.parsed_output;
+    if (!out) throw new Error("unreadable");
+    return {
+      findings: out.findings.slice(0, 6).map((f, i) => ({ id: `f${i}`, label: f.label.trim(), text: f.text.trim(), sources: f.sources.filter((x) => /^https?:\/\//.test(x.url)).slice(0, 4) })),
+      read: out.read.map((x) => x.trim()).filter((x) => x && x.length <= 32).slice(0, 6),
+    };
+  }
+  throw new Error("took too long");
 }

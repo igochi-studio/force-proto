@@ -1,86 +1,163 @@
 "use client";
 
-// Why you and a resident are connected, the v1.1 connection detail: the kind of connection,
-// one sentence on why, one question you could explore together, and the evidence from both
-// approved snapshots. Whether a person reviewed it or Force suggested it is always said.
-// Never raw private content. Without a connection, it says so rather than inventing one.
+// A resident's page, the way Gigi shows a person: their face and name big, what they're on,
+// the themes they work through, then "You and them" (why you're connected, what to explore,
+// the evidence from both approved snapshots, reviewed or suggested) and their Scoops. At the
+// bottom, a first message Force has drafted for you to change and send. Everything about
+// them comes from their approved, shared snapshot; nothing is invented.
 
-import { CONNECTION_LABEL, FIELD_LABEL, type Evidence } from "@/contract/residency";
-import { ME_FACE, residentById } from "@/data/residency";
+import { useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { CONNECTION_BADGE, CONNECTION_LABEL, FIELD_LABEL, isConnection, type Connection, type Evidence, type Snapshot } from "@/contract/residency";
+import { residentById } from "@/data/residency";
 import { f } from "@/lib/f/store";
 import { useR } from "@/lib/f/residency";
+import { COHORT } from "@/lib/r/api";
 import { useCohort } from "@/lib/r/cohort";
 import Face from "../f/Face";
-import Glass from "../f/Glass";
 import Nav from "../f/Nav";
-import { haptic } from "../f/ui";
+import Grow from "./Grow";
+import { I, Logo, SPRING, haptic } from "../f/ui";
 
-export default function ConnectionPage({ id }: { id: string }) {
+export function Badge({ c }: { c: Connection }) {
+  const b = CONNECTION_BADGE[c.type];
+  return (
+    <span className="inline-flex items-center gap-[6px] whitespace-nowrap rounded-full bg-paper px-2 py-[2px] t-meta font-medium text-ink" style={{ boxShadow: "var(--lift-1)" }}>
+      <span className="h-[7px] w-[7px] rounded-full" style={{ background: `var(--${b.hue}-4)` }} aria-hidden />
+      {b.label}
+    </span>
+  );
+}
+
+// A first hello when Force has no drafted one: plain, specific, small.
+const hello = (name: string, s?: Snapshot) => `Hi ${name}! I saw you're working on ${(s?.intent ?? "something I'd love to hear about").replace(/\.$/, "").replace(/^[A-Z]/, (m) => m.toLowerCase())}. Could I steal ten minutes this week to hear how it's going?`;
+
+export default function ConnectionPage({ id, say = false }: { id: string; say?: boolean }) {
   const me = useR((s) => s.me);
   const snapshot = useR((s) => s.snapshot);
   const { graph } = useCohort();
+  const [writing, setWriting] = useState(say);
   const p = residentById(id);
+  const theirs = COHORT.find((s) => s.resident_id === id);
   const pid = `person_${id}`;
-  const c = graph.edges.find((e) => "why_connected" in e && (e.source === pid || e.target === pid) && (e.source === `person_${me}` || e.target === `person_${me}`));
-  const conn = c && "why_connected" in c ? c : null;
-  const theirs = conn?.evidence.find((e) => e.snapshot_id !== snapshot?.id);
-  const yours = conn?.evidence.find((e) => e.snapshot_id === snapshot?.id);
+  const conn = graph.edges.filter(isConnection).find((e) => (e.source === pid || e.target === pid) && (e.source === `person_${me}` || e.target === `person_${me}`)) ?? null;
+  const [text, setText] = useState(() => conn?.opener ?? hello(p?.name ?? "", theirs));
   if (!p) return null;
+  const evTheirs = conn?.evidence.find((e) => e.snapshot_id !== snapshot?.id);
+  const evYours = conn?.evidence.find((e) => e.snapshot_id === snapshot?.id);
+  const scoops = theirs
+    ? ([
+        ["Working on", theirs.intent],
+        ["The problem", theirs.problem],
+        ["Stuck on", theirs.current_frontier],
+        ["Can offer", theirs.contribution.can_offer.join(", ")],
+        ["Looking for", theirs.contribution.seeking.join(", ")],
+      ].filter(([, v]) => v) as [string, string][])
+    : [];
+  const send = () => {
+    if (!text.trim()) return;
+    haptic("done");
+    f.openThread(id, conn ? { why: conn.why_connected, explore: conn.what_to_explore } : undefined);
+    f.dmSend(id, text);
+    f.push({ name: "dm", id });
+  };
+
   return (
     <div className="relative flex h-full flex-col">
       <Nav title={p.name} />
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-[72px]">
-        <div className="flex items-center justify-center">
-          <Glass size={64} {...ME_FACE} zoom={240} />
-          <span className="-ml-3">
-            <Face face={p.face} size={64} />
+        <div className="px-1">
+          <span className="relative inline-block">
+            <Face face={p.face} size={88} />
+            {conn && (
+              <span className="absolute -bottom-2 left-1/2 -translate-x-1/2">
+                <Badge c={conn} />
+              </span>
+            )}
           </span>
+          <h1 className="mt-5 t-large text-ink">{p.name}</h1>
+          <p className="mt-1 t-body text-ink-3">{p.work}</p>
+          {!!theirs?.approach.length && (
+            <div className="mt-3 flex flex-wrap gap-[6px]">
+              {theirs.approach.map((a) => (
+                <span key={a} className="rounded-full bg-paper px-3 py-[6px] t-label text-ink" style={{ boxShadow: "var(--lift-1)" }}>
+                  {a}
+                </span>
+              ))}
+            </div>
+          )}
+          <p className="mt-3 flex items-center gap-[6px] t-meta text-ink-3">
+            <Logo size={12} /> From {p.name}&apos;s approved snapshot, shared with the residency
+          </p>
         </div>
-        {conn ? (
-          <>
-            <p className="mt-4 text-center t-label text-ink-3">{CONNECTION_LABEL[conn.type]}</p>
-            <p className="mt-2 px-2 text-center t-title text-ink">{conn.why_connected}</p>
-            <p className="mt-3 flex items-center justify-center gap-[6px] t-meta text-ink-3">
-              <span className="h-[6px] w-[6px] rounded-full" style={{ background: conn.origin === "reviewed" ? "var(--sage-4)" : "var(--grey-300)" }} aria-hidden />
-              {conn.origin === "reviewed" ? `Reviewed by ${conn.reviewed_by ?? "the Force team"}` : "Suggested by Force, not yet reviewed"}
-            </p>
 
-            <section className="mt-8">
-              <h3 className="mb-3 px-1 t-body text-ink-3">Something to explore together</h3>
-              <p className="rounded-[28px] bg-paper p-5 t-body font-semibold text-ink" style={{ boxShadow: "var(--lift-1)" }}>
-                {conn.what_to_explore}
+        <section className="mt-8">
+          <h3 className="mb-3 px-1 t-body text-ink-3">You and {p.name}</h3>
+          {conn ? (
+            <div className="rounded-[28px] bg-paper p-5" style={{ boxShadow: "var(--lift-1)" }}>
+              <p className="t-meta text-ink-3">{CONNECTION_LABEL[conn.type]}</p>
+              <p className="mt-1 t-title text-ink">{conn.why_connected}</p>
+              <div className="mt-4 rounded-[18px] bg-fill px-4 py-3">
+                <p className="t-meta text-ink-3">Something to explore together</p>
+                <p className="mt-1 t-body text-ink">{conn.what_to_explore}</p>
+              </div>
+              <p className="mt-3 flex items-center gap-[6px] t-meta text-ink-3">
+                <span className="h-[6px] w-[6px] rounded-full" style={{ background: conn.origin === "reviewed" ? "var(--sage-4)" : "var(--grey-300)" }} aria-hidden />
+                {conn.origin === "reviewed" ? `Reviewed by ${conn.reviewed_by ?? "the Force team"}` : "Suggested by Force, not yet reviewed"}
               </p>
-            </section>
+            </div>
+          ) : (
+            <p className="rounded-[28px] bg-fill p-5 t-body text-ink-2">Force hasn&apos;t found a clear reason to connect you two yet. It only suggests one when it can say why.</p>
+          )}
+        </section>
 
-            <section className="mt-8">
-              <h3 className="mb-1 px-1 t-body text-ink-3">Why Force thinks so</h3>
-              <p className="mb-3 px-1 t-label text-ink-3">From both of your approved snapshots.</p>
-              <ul className="flex flex-col gap-2">
-                {theirs && <Quote who={p.name} e={theirs} />}
-                {yours && <Quote who="You" e={yours} />}
-              </ul>
-            </section>
-          </>
-        ) : (
-          <>
-            <p className="mt-4 text-center t-title text-ink">{p.name}</p>
-            <p className="mt-2 px-4 text-center t-body text-ink-3">{p.work}</p>
-            <p className="mt-6 rounded-[28px] bg-fill p-5 t-body text-ink-2">Force hasn&apos;t found a clear reason to connect you two yet. It only suggests a connection when it can say why.</p>
-          </>
+        {scoops.length > 0 && (
+          <section className="mt-8">
+            <h3 className="mb-3 px-1 t-body text-ink-3">Scoops</h3>
+            <ul className="scroll-row no-scrollbar -mx-4 gap-2 px-4 pb-2">
+              {scoops.map(([k, v]) => (
+                <li key={k} className="flex w-[232px] shrink-0 flex-col rounded-[24px] bg-paper p-4" style={{ boxShadow: "var(--lift-1)" }}>
+                  <span className="t-meta uppercase text-ink-3">{k}</span>
+                  <p className="mt-2 flex-1 t-body text-ink">{v}</p>
+                  <span className="mt-3 t-meta text-ink-3">Their snapshot</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {conn && (evTheirs || evYours) && (
+          <section className="mt-8">
+            <h3 className="mb-1 px-1 t-body text-ink-3">Why Force thinks so</h3>
+            <p className="mb-3 px-1 t-label text-ink-3">From both of your approved snapshots.</p>
+            <ul className="flex flex-col gap-2">
+              {evTheirs && <Quote who={p.name} e={evTheirs} />}
+              {evYours && <Quote who="You" e={evYours} />}
+            </ul>
+          </section>
         )}
       </div>
+
       <div className="shrink-0 px-4 pb-3 pt-2">
-        <button
-          type="button"
-          onClick={() => {
-            haptic();
-            f.openThread(id, conn ? { why: conn.why_connected, explore: conn.what_to_explore } : undefined);
-            f.push({ name: "dm", id });
-          }}
-          className="press pill-ink h-[52px] w-full justify-center gap-2 t-body font-medium"
-        >
-          Message {p.name}
-        </button>
+        <AnimatePresence initial={false} mode="popLayout">
+          {writing ? (
+            <motion.div key="write" className="rounded-[26px] bg-paper p-3" style={{ boxShadow: "var(--lift-2)" }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.1 } }} transition={SPRING.ui}>
+              <p className="flex items-center gap-[6px] px-2 pt-1 t-meta text-ink-3">
+                <Logo size={12} /> Force drafted this from both snapshots. Make it yours.
+              </p>
+              <div className="flex items-end gap-2 pl-2">
+                <Grow value={text} onChange={setText} onSend={send} autoFocus aria-label={`Message to ${p.name}`} max={7} />
+                <button type="button" aria-label="Send" onClick={send} disabled={!text.trim()} className="press mb-[2px] grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ink text-paper disabled:opacity-20">
+                  <I.Up size={18} />
+                </button>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.button key="hi" type="button" onClick={() => (haptic(), setWriting(true))} className="press pill-ink h-[52px] w-full justify-center t-body font-medium" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.1 } }}>
+              Say hi to {p.name}
+            </motion.button>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
