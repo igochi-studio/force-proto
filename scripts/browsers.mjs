@@ -159,7 +159,7 @@ for (const run of runs) {
   });
   await step("how you come across, with the suggested action inside it", async () => {
     await page.getByText("How you come across").first().waitFor({ timeout: 3000 });
-    await page.getByText(/shows up most/).first().waitFor({ timeout: 2000 });
+    await page.getByRole("group", { name: "Strengths chart" }).first().waitFor({ timeout: 2000 });
     if (await page.getByText("At a glance").count()) throw new Error("At a glance should be gone");
   });
   await step("settings holds the sources, not the page", async () => {

@@ -7,18 +7,82 @@
 // why those strengths, and how much Onairos saw.
 
 import { useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
 import { coverageLine, type OnairosNormalized } from "@/contract/residency";
 import { ART_SRC } from "@/data/mira";
 import Glass from "../f/Glass";
-import { I, SPRING, haptic } from "../f/ui";
+import { haptic } from "../f/ui";
 import { Band } from "./Painted";
 
 const PAINT = { backgroundImage: `url(${ART_SRC.dusk})`, backgroundSize: "400% 1200%", backgroundPosition: "40% 55%" };
-const GREYS = ["#c9c6c1", "#e2e0dc"];
+
+// Strengths the way Health draws a week: the selected one large on top with where it showed,
+// tall rounded bars on faint gridlines below. Tap a bar to select it; it takes the painting,
+// the rest stay soft. Each value is that trait's own strength, out of 100.
+function StrengthsChart({ top, mine, p }: { top: OnairosNormalized["positive"]; mine: boolean; p: OnairosNormalized }) {
+  const [pick, setPick] = useState(top[0].name);
+  const t = top.find((x) => x.name === pick) ?? top[0];
+  const H = 168;
+  return (
+    <figure className="mt-2 rounded-[28px] bg-paper p-5" style={{ boxShadow: "var(--lift-1)" }}>
+      <figcaption className="t-meta text-ink-3">Strengths</figcaption>
+      <div className="mt-2 flex items-baseline gap-2">
+        <span className="t-large tabular-nums text-ink">{t.strength}</span>
+        <span className="t-label text-ink-3">of 100</span>
+      </div>
+      <p className="t-body font-semibold text-ink">{t.name}</p>
+      <p className="mt-1 min-h-[40px] t-label text-ink-2">{t.evidence ?? (t.name === top[0].name ? `Shows up most ${mine ? "in what you do" : "for them"}.` : "")}</p>
+
+      <div className="relative mt-5" style={{ height: H }} role="group" aria-label="Strengths chart">
+        {[100, 50, 0].map((v) => (
+          <div key={v} className="pointer-events-none absolute inset-x-0 flex items-center gap-2" style={{ top: `${((100 - v) / 100) * H - 8}px` }} aria-hidden>
+            <span className="h-px flex-1" style={{ backgroundImage: "linear-gradient(to right, rgb(28 27 26 / 0.12) 50%, transparent 0)", backgroundSize: "6px 1px" }} />
+            <span className="w-6 text-right t-meta tabular-nums text-ink-4">{v}</span>
+          </div>
+        ))}
+        <div className="absolute inset-y-0 left-0 right-8 flex items-end justify-around gap-2">
+          {top.map((x) => {
+            const on = x.name === t.name;
+            return (
+              <button key={x.name} type="button" aria-pressed={on} aria-label={`${x.name}, ${x.strength} of 100`} onClick={() => (haptic(), setPick(x.name))} className="flex h-full max-w-[48px] flex-1 items-end justify-center">
+                <span className="block w-full rounded-[10px] transition-[background-color,opacity] duration-200" style={{ height: `${Math.max(4, x.strength)}%`, ...(on ? PAINT : { background: "#e6e3df" }) }} />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="mr-8 mt-2 flex justify-around gap-2" aria-hidden>
+        {top.map((x) => (
+          <span key={x.name} className={`max-w-[64px] flex-1 text-center t-meta leading-tight ${x.name === t.name ? "font-medium text-ink" : "text-ink-3"}`}>
+            {x.name}
+          </span>
+        ))}
+      </div>
+
+      {p.explanation && (
+        <div className="mt-5 rounded-[20px] bg-fill px-4 py-3">
+          <p className="t-meta text-ink-3">Why these strengths</p>
+          <p className="mt-1 t-body text-ink">{p.explanation}</p>
+        </div>
+      )}
+      <p className="mt-4 t-meta text-ink-3">
+        Each value is how strongly it showed {mine ? "in your apps" : "in their apps"}, never a comparison with anyone. {coverageLine(p)}
+      </p>
+      <table className="sr-only">
+        <caption>Strengths</caption>
+        <tbody>
+          {top.map((x) => (
+            <tr key={x.name}>
+              <th>{x.name}</th>
+              <td>{x.strength} of 100</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </figure>
+  );
+}
 
 export default function Traits({ p, who, children }: { p: OnairosNormalized; who?: string; children?: React.ReactNode }) {
-  const [open, setOpen] = useState<string | null>(null);
   const top = p.positive.slice(0, 5);
   if (!p.archetype && !p.summary && !top.length) return null;
   const mine = !who;
@@ -46,64 +110,7 @@ export default function Traits({ p, who, children }: { p: OnairosNormalized; who
         </div>
       </div>
 
-      {top.length > 0 && (
-        <figure className="mt-2 rounded-[28px] bg-paper p-5" style={{ boxShadow: "var(--lift-1)" }}>
-          <figcaption className="t-meta text-ink-3">Strengths · {top.length} Onairos found</figcaption>
-          <p className="mt-1 t-body font-semibold text-ink">{top[0].name} shows up most{mine ? " in what you do" : ""}.</p>
-          <ul className="mt-4 flex flex-col gap-3">
-            {top.map((t, i) => {
-              const on = open === t.name;
-              return (
-                <li key={t.name}>
-                  <button type="button" aria-expanded={on} disabled={!t.evidence} onClick={() => (haptic(), setOpen(on ? null : t.name))} className="press block w-full text-left">
-                    <span className="flex items-baseline justify-between gap-3">
-                      <span className="flex items-center gap-1 t-label text-ink">
-                        {t.name}
-                        {t.evidence && (
-                          <span className={`text-ink-4 ${on ? "rotate-90" : ""}`} style={{ transition: "rotate 200ms" }}>
-                            <I.Chevron size={13} />
-                          </span>
-                        )}
-                      </span>
-                      <span className="t-num text-ink">{t.strength}</span>
-                    </span>
-                    <span className="mt-[6px] block h-2 w-full rounded-[4px] bg-fill" aria-hidden>
-                      <span className="block h-full rounded-[4px]" style={{ width: `${Math.max(6, t.strength)}%`, ...(i === 0 ? PAINT : { background: GREYS[(i - 1) % 2] }) }} />
-                    </span>
-                  </button>
-                  <AnimatePresence initial={false}>
-                    {on && t.evidence && (
-                      <motion.p className="overflow-hidden t-label text-ink-2" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={SPRING.ui}>
-                        <span className="block pt-2">{t.evidence}</span>
-                      </motion.p>
-                    )}
-                  </AnimatePresence>
-                </li>
-              );
-            })}
-          </ul>
-          {p.explanation && (
-            <div className="mt-4 rounded-[20px] bg-fill px-4 py-3">
-              <p className="t-meta text-ink-3">Why these strengths</p>
-              <p className="mt-1 t-body text-ink">{p.explanation}</p>
-            </div>
-          )}
-          <p className="mt-4 t-meta text-ink-3">
-            Each number is how strongly it showed {mine ? "in your apps" : "in their apps"}, out of 100, never a comparison with anyone. {coverageLine(p)}
-          </p>
-          <table className="sr-only">
-            <caption>Strengths</caption>
-            <tbody>
-              {top.map((t) => (
-                <tr key={t.name}>
-                  <th>{t.name}</th>
-                  <td>{t.strength} of 100</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </figure>
-      )}
+      {top.length > 0 && <StrengthsChart top={top} mine={mine} p={p} />}
 
       {children}
     </section>
