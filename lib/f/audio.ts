@@ -81,7 +81,10 @@ export async function record(): Promise<Recording> {
   }
   const buf = new Uint8Array(an.fftSize);
 
-  if (Rec) {
+  // Safari (iPhone, iPad, Mac) keeps the microphone after its own recognition runs, so the
+  // next recording comes back silent. There, the server's transcription is the only one.
+  const apple = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS|Edg|Firefox/.test(navigator.userAgent);
+  if (Rec && !apple) {
     try {
       sr = new Rec();
       sr.continuous = true;
@@ -167,9 +170,13 @@ export async function record(): Promise<Recording> {
   };
 }
 
-// Your words, from the server. Empty if it's unavailable or slow; never made up.
+// Your words, from the server, with one retry. Empty if it's unavailable; never made up.
 async function transcribe(blob: Blob): Promise<string> {
   if (!blob.size) return "";
+  const first = await transcribeOnce(blob);
+  return first || transcribeOnce(blob);
+}
+async function transcribeOnce(blob: Blob): Promise<string> {
   const body = new FormData();
   body.set("file", blob, `answer.${blob.type.includes("webm") ? "webm" : "m4a"}`);
   const stop = new AbortController();

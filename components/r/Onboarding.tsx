@@ -204,9 +204,10 @@ function Talk({ onNext }: { onNext: () => void }) {
       await say(QUESTIONS[qi + 1], 450);
       return;
     }
-    setPhase("offer");
-    await say("That's all three. Two quick ones, both optional, so the right people here can find you.", 400);
-    await say("What could you help other residents with? Tap any that fit, or put it in your own words.", 450);
+    // The two optional contribution questions are off for now (the team's call); what you
+    // can offer and seek can still be added on your snapshot page.
+    await say("That's all three. Thank you.", 350);
+    await draft();
   };
 
   // What you offer, then what you'd value. Either can be skipped.

@@ -5,11 +5,9 @@
 // because they chose to share it. The archetype, the summary, the strengths by name (no
 // scores), why those strengths, and what Onairos read: how much, and from where.
 
-import { useState } from "react";
 import type { OnairosNormalized } from "@/contract/residency";
 import { ART_SRC } from "@/data/mira";
 import Glass from "../f/Glass";
-import { haptic } from "../f/ui";
 import { Band, cropOf } from "./Painted";
 
 const PAINT = { backgroundImage: `url(${ART_SRC.dusk})`, backgroundSize: "400% 1200%", backgroundPosition: "40% 55%" };
@@ -17,32 +15,31 @@ const PAINT = { backgroundImage: `url(${ART_SRC.dusk})`, backgroundSize: "400% 1
 // Strengths by name only, strongest first: the team doesn't show Onairos's numbers. Each is
 // a painted tile; tap one for where it showed when Onairos says.
 function Strengths({ top, mine, p }: { top: OnairosNormalized["positive"]; mine: boolean; p: OnairosNormalized }) {
-  const [pick, setPick] = useState<string | null>(null);
-  const t = top.find((x) => x.name === pick);
   return (
-    <div className="mt-2 rounded-[28px] bg-paper p-5" style={{ boxShadow: "var(--lift-1)" }}>
-      <p className="t-meta text-ink-3">{mine ? "Your strengths" : "Strengths"} · strongest first</p>
-      <ul className="mt-3 grid grid-cols-2 gap-2">
-        {top.map((x, i) => {
-          const [art, cx, cy] = cropOf(i);
-          const on = pick === x.name;
-          return (
-            <li key={x.name}>
-              <button type="button" aria-pressed={on} disabled={!x.evidence} onClick={() => (haptic(), setPick(on ? null : x.name))} className="press flex h-full w-full flex-col overflow-hidden rounded-[20px] bg-fill text-left">
-                <span className="block h-12 bg-cover" style={{ backgroundImage: `url(${ART_SRC[art]})`, backgroundPosition: `${cx}% ${cy}%`, backgroundSize: "300%" }} aria-hidden />
-                <span className="block px-3 pb-3 pt-2 t-label font-medium leading-snug text-ink">{x.name}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      {t?.evidence && <p className="mt-3 rounded-[16px] bg-fill px-3 py-2 t-label text-ink-2">{t.evidence}</p>}
-      {p.explanation && (
-        <div className="mt-4 rounded-[20px] bg-fill px-4 py-3">
-          <p className="t-meta text-ink-3">Why these strengths</p>
-          <p className="mt-1 t-body text-ink">{p.explanation}</p>
+    <div className="mt-2 grid grid-cols-2 gap-2">
+      {/* Side by side: what Onairos found, and why */}
+      <div className="flex flex-col rounded-[28px] bg-paper p-4" style={{ boxShadow: "var(--lift-1)" }}>
+        <p className="t-meta text-ink-3">{mine ? "Your strengths" : "Strengths"}</p>
+        <ul className="mt-3 flex flex-col gap-3">
+          {top.map((x, i) => {
+            const [art, cx, cy] = cropOf(i);
+            return (
+              <li key={x.name} className="flex items-start gap-2">
+                <span className="mt-[1px] h-5 w-5 shrink-0 rounded-full bg-cover" style={{ backgroundImage: `url(${ART_SRC[art]})`, backgroundPosition: `${cx}% ${cy}%`, backgroundSize: "400%", boxShadow: "inset 0 0 0 1px rgb(255 255 255 / 0.5)" }} aria-hidden />
+                <span className="t-label font-medium leading-snug text-ink">{x.name}</span>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="mt-auto pt-3 t-meta text-ink-3">Strongest first</p>
+      </div>
+      <div className="flex flex-col overflow-hidden rounded-[28px] bg-paper" style={{ boxShadow: "var(--lift-1)" }}>
+        <Band art="dusk" h={40} />
+        <div className="flex flex-1 flex-col p-4">
+          <p className="t-meta text-ink-3">Why these</p>
+          <p className="mt-2 t-label text-ink">{p.explanation ?? "Onairos didn't say why."}</p>
         </div>
-      )}
+      </div>
     </div>
   );
 }

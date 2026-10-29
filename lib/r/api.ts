@@ -23,10 +23,16 @@ export const live = !!BASE;
 const flag = (k: string) => typeof window !== "undefined" && new URLSearchParams(window.location.search).get(k) === "fail";
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function call<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, body === undefined ? { credentials: "include" } : { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!res.ok) throw new Error(`${path} answered ${res.status}`);
-  return res.json() as Promise<T>;
+async function call<T>(path: string, body?: unknown, ms = 58000): Promise<T> {
+  const stop = new AbortController();
+  const t = setTimeout(() => stop.abort(), ms);
+  try {
+    const res = await fetch(`${BASE}${path}`, body === undefined ? { credentials: "include", signal: stop.signal } : { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: stop.signal });
+    if (!res.ok) throw new Error(`${path} answered ${res.status}`);
+    return (await res.json()) as T;
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 export const COHORT = cohort.snapshots as Snapshot[];
@@ -50,12 +56,13 @@ export async function synthesize(input: SynthInput): Promise<Snapshot> {
     await wait(1200);
     throw new Error("Synthesis didn't answer");
   }
-  return call<Snapshot>("/api/residency/intent/synthesize", input);
+  // One quiet retry before anyone sees a problem.
+  return call<Snapshot>("/api/residency/intent/synthesize", input).catch(() => call<Snapshot>("/api/residency/intent/synthesize", input));
 }
 
 // What's public about you, only because you said yes.
 export async function footprint(name: string, links: string[]): Promise<{ findings: Finding[]; read: string[] }> {
-  return call("/api/residency/footprint", { consent: true, name, links });
+  return call("/api/residency/footprint", { consent: true, name, links }, 118000);
 }
 
 // Who you're connected with, once your snapshot is approved and shared.

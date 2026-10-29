@@ -20,7 +20,9 @@ export async function POST(req: Request) {
   const draft = synthesize(input);
   if (!hasClaude()) return Response.json(draft);
   try {
-    return Response.json(await readSnapshot(input, draft, THEMES));
+    // Within the function's time, or the plain draft: never a timeout the resident sees.
+    const budget = new Promise<never>((_, no) => setTimeout(() => no(new Error("took too long")), 45000));
+    return Response.json(await Promise.race([readSnapshot(input, draft, THEMES), budget]));
   } catch (e) {
     console.error("synthesize: model failed, sending the plain draft", e);
     return Response.json(draft);

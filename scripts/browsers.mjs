@@ -112,18 +112,6 @@ for (const run of runs) {
       await typeAnswer(text);
     });
   }
-  await step("what you can offer", async () => {
-    await page.getByText("What could you help other residents with").waitFor({ timeout: 8000 });
-    await idle();
-    await tap(page.getByRole("button", { name: "Skills", exact: true }));
-    await tap(page.getByRole("button", { name: "Done" }));
-  });
-  await step("what you'd value", async () => {
-    await page.getByText("And what would you value help with").waitFor({ timeout: 8000 });
-    await idle();
-    await tap(page.getByRole("button", { name: "Feedback", exact: true }));
-    await tap(page.getByRole("button", { name: "Done" }));
-  });
   await step("snapshot grows in the chat", async () => {
     await page.getByText("Intent snapshot").waitFor({ timeout: 8000 });
     await page.getByRole("button", { name: "Check what Force understood" }).waitFor({ timeout: 60000 });
@@ -246,11 +234,6 @@ for (const run of runs) {
         await fp.getByRole("button", { name: "Type instead" }).tap();
         await fp.getByLabel("Your answer").fill(t);
         await fp.getByLabel("Your answer").press("Enter");
-      }
-      for (let i = 0; i < 2; i++) {
-        await fp.getByRole("button", { name: "Skip" }).waitFor({ timeout: 8000 });
-        await fp.waitForFunction(() => !document.querySelector('[role=status][aria-label="Force is writing"]'), null, { timeout: 8000 });
-        await fp.getByRole("button", { name: "Skip" }).tap();
       }
       await fp.getByRole("button", { name: "Use a plain draft from my answers" }).waitFor({ timeout: 10000 });
       await fp.screenshot({ path: new globalThis.URL(`${run.name}-12-synth-failed.png`, OUT).pathname });
