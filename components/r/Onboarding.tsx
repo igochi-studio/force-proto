@@ -53,10 +53,14 @@ export default function ResidencyOnboarding() {
     setStep(s);
   };
 
-  // The splash moves on by itself once the line has been read.
+  // The splash stays five seconds in all, then moves on by itself (a tap moves on sooner).
+  const shownAt = useRef(0);
+  useEffect(() => {
+    shownAt.current = performance.now();
+  }, []);
   useEffect(() => {
     if (!painted || step !== "splash") return;
-    const id = setTimeout(() => setStep("connect"), 900);
+    const id = setTimeout(() => setStep("connect"), Math.max(0, 5000 - (performance.now() - shownAt.current)));
     return () => clearTimeout(id);
   }, [painted, step]);
 
@@ -68,7 +72,7 @@ export default function ResidencyOnboarding() {
             <button type="button" onClick={() => painted && go("connect")} className="flex flex-1 flex-col items-center justify-center px-6 text-center" aria-label="Continue">
               <PaintedMark size={236} onDone={() => setPainted(true)} />
               <motion.p className="mt-10 max-w-[330px] t-body text-ink-2" initial={{ opacity: 0 }} animate={{ opacity: painted ? 1 : 0 }} transition={{ duration: 0.3 }}>
-                A companion that builds your longitudinal memory and helps you find your perfect side quest partnerships.
+                A social intelligence platform
               </motion.p>
             </button>
           </Screen>
