@@ -211,12 +211,14 @@ for (const run of runs) {
   await step("the graph for the pitch, on its own page", async () => {
     await page.goto(URL.replace(/\/?(\?.*)?$/, "") + "/graph", { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: "Who's here" }).waitFor({ timeout: 8000 });
-    // Four rows: archetypes, people, intents, approaches. Tapping a person shows their card.
+    // People, each with their archetype and intent, round the approaches they share; tapping
+    // someone docks their card.
     await page.getByRole("button", { name: /^Meera, person$/ }).waitFor({ timeout: 3000 });
-    await page.getByRole("button", { name: /^Archetype: Patient Listener/ }).waitFor({ timeout: 2000 });
+    await page.getByText("The Patient Listener").first().waitFor({ timeout: 2000 });
     await page.getByRole("button", { name: /^Approach: User research, \d+ people/ }).waitFor({ timeout: 2000 });
+    if (await page.getByRole("button", { name: /^Approach: Film/ }).count()) throw new Error("a one-person approach is on the graph");
     await tap(page.getByRole("button", { name: /^Meera, person$/ }));
-    await page.getByText("Similar strengths").first().waitFor({ timeout: 2000 });
+    await page.getByText("Wants to").first().waitFor({ timeout: 2000 });
   });
   await page.waitForTimeout(1500);
   await shot("12-graph");
