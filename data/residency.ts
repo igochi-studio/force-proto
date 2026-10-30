@@ -183,3 +183,70 @@ export const RESIDENTS: Resident[] = [
 ];
 
 export const residentById = (id: string) => RESIDENTS.find((x) => x.id === id);
+
+// A sample you, for the graph when the person looking hasn't shared a snapshot of their own:
+// the graph is a demo, so it always has a you in it. Labelled as a sample wherever it shows.
+export const SAMPLE_YOU: Snapshot = {
+  id: "snapshot_sample_you",
+  resident_id: "sample_you",
+  name: "You",
+  intent: "Turn a year of voice notes into a short film about the people on my street.",
+  problem: "Ordinary neighbourhood stories disappear because nobody records them.",
+  approach: ["User research", "Writing", "Prototyping"],
+  current_frontier: "How do I get neighbours to trust me with their stories?",
+  contribution: { can_offer: [], seeking: [] },
+  next_step: null,
+  provenance: {},
+  inferred: [],
+  status: "approved",
+  shared: true,
+  updated_at: "2026-10-30T00:00:00.000Z",
+  titles: { intent: "A film about my street" },
+  persona: {
+    positive: [
+      { name: "Curiosity", strength: 0 },
+      { name: "Empathy", strength: 0 },
+      { name: "Making", strength: 0 },
+    ],
+    private_growth: [],
+    summary: null,
+    explanation: null,
+    archetype: "Story Keeper",
+    nudges: [],
+    coverage: { analyzed: null, sampled: null, label: null, platforms: [] },
+    sources: [],
+    fixture: true,
+  },
+};
+
+// Force's suggestions for the sample you, as the connections model would write them.
+export const SAMPLE_YOUR_LINKS: Connection[] = [
+  {
+    id: "conn_sample_you_zoya",
+    source: "person_sample_you",
+    target: "person_zoya",
+    type: "shared_exploration",
+    why_connected: "You're both trying to earn the trust of people who have never been recorded.",
+    what_to_explore: "What made the first person you recorded say yes?",
+    evidence_refs: ["snapshot_sample_you", "snapshot_zoya"],
+    evidence: [
+      { snapshot_id: "snapshot_sample_you", field: "current_frontier", text: "How do I get neighbours to trust me with their stories?" },
+      { snapshot_id: "snapshot_zoya", field: "current_frontier", text: "How do I earn the trust of people who have never been filmed?" },
+    ],
+    origin: "automated",
+  },
+  {
+    id: "conn_sample_you_kabir",
+    source: "person_sample_you",
+    target: "person_kabir",
+    type: "complementary_approach",
+    why_connected: "Kabir prototypes hardware fast; you could build and test a recording kit together.",
+    what_to_explore: "What's the smallest kit that would let a neighbour record themselves?",
+    evidence_refs: ["snapshot_sample_you", "snapshot_kabir"],
+    evidence: [
+      { snapshot_id: "snapshot_sample_you", field: "approach", text: "Prototyping" },
+      { snapshot_id: "snapshot_kabir", field: "approach", text: "Hardware, Prototyping" },
+    ],
+    origin: "automated",
+  },
+];

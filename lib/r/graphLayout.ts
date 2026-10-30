@@ -38,7 +38,7 @@ const ROW: Record<GraphNode["type"], Row> = { archetype: "archetype", person: "p
 // How big each node is drawn, so the layout can keep labels apart.
 export type Measure = (n: GraphNode, row: Row, members: number, me: boolean) => { w: number; h: number };
 
-export function layoutGraph(full: Graph, similar: Similar[], width: number, measure: Measure, me?: string): Layout {
+export function layoutGraph(full: Graph, similar: Similar[], width: number, measure: Measure, me?: string, fit?: number): Layout {
   // A bucket only one person is in groups no one: it stays on their card, off the graph.
   const inBucket = new Map<string, Set<string>>();
   const ownerOfIntent = new Map(full.edges.filter((e) => !isConnection(e) && e.type === "person_has_intent").map((e) => [e.target, e.source]));
@@ -152,14 +152,21 @@ export function layoutGraph(full: Graph, similar: Similar[], width: number, meas
     }
   }
 
-  // Fitted to the phone's width: squeezed if it's wider, spread sideways (only) if it's
-  // narrower, so it fills the screen rather than running down the middle. Then no two boxes
-  // overlap: sideways they stay inside the phone, and the graph grows as tall as it needs.
-  const left = Math.min(...pos.map((p) => p[0]));
-  const right = Math.max(...pos.map((p) => p[0]));
-  const widest = Math.max(...box.map((b) => b.w));
-  const sx = Math.min(2.4, (width - 16 - widest) / Math.max(1, right - left));
-  const sy = Math.min(1, sx);
+  // Fitted to the space: squeezed if it's bigger, spread out if it's smaller, so it fills
+  // the screen rather than huddling in the middle; with a height to fit, up and down too.
+  // Then no two boxes overlap: sideways they stay inside, and the graph grows taller if it
+  // has to.
+  const left = k ? Math.min(...pos.map((p) => p[0])) : 0;
+  const right = k ? Math.max(...pos.map((p) => p[0])) : 0;
+  const high = k ? Math.min(...pos.map((p) => p[1])) : 0;
+  const low = k ? Math.max(...pos.map((p) => p[1])) : 0;
+  const widest = k ? Math.max(...box.map((b) => b.w)) : 0;
+  const tallest = k ? Math.max(...box.map((b) => b.h)) : 0;
+  // A margin round it on a big screen; stretched no more than about one and a half times,
+  // so neighbours still look like neighbours.
+  const margin = width > 700 ? 48 : 8;
+  const sx = Math.min(1.6, (width - margin * 2 - widest) / Math.max(1, right - left));
+  const sy = fit ? Math.max(0.5, Math.min(1.6, (fit - 48 - tallest) / Math.max(1, low - high))) : Math.min(1, sx);
   const ox = width / 2 - ((left + right) / 2) * sx;
   for (const p of pos) {
     p[0] = p[0] * sx + ox;
