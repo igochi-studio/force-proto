@@ -211,7 +211,12 @@ for (const run of runs) {
   await step("the graph for the pitch, on its own page", async () => {
     await page.goto(URL.replace(/\/?(\?.*)?$/, "") + "/graph", { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: /Everyone, by what they/ }).waitFor({ timeout: 8000 });
-    await page.locator('canvas[aria-label^="The residency\'s graph"]').waitFor({ timeout: 3000 });
+    // Four rows: archetypes, people, intents, approaches. Tapping a person shows their card.
+    await page.getByRole("button", { name: /^Meera, person$/ }).waitFor({ timeout: 3000 });
+    await page.getByRole("button", { name: /^Archetype: Patient Listener/ }).waitFor({ timeout: 2000 });
+    await page.getByRole("button", { name: /^Approach: User research, \d+ people/ }).waitFor({ timeout: 2000 });
+    await tap(page.getByRole("button", { name: /^Meera, person$/ }));
+    await page.getByText("Strengths in common").first().waitFor({ timeout: 2000 });
   });
   await page.waitForTimeout(1500);
   await shot("12-graph");

@@ -84,7 +84,7 @@ export async function approve(s: Snapshot, shared: boolean): Promise<Snapshot> {
 // come from connections(); everyone else's are the reviewed ones.
 export function localGraph(me: Snapshot | null, mine: Connection[] = []): { graph: Graph; mine: Connection[] } {
   const others = COHORT.filter((s) => s.resident_id !== me?.resident_id);
-  const graph = projectGraph(me ? [...others, me] : others, [...REVIEWED, ...mine], (s) => s.intent ?? s.problem ?? "Unknown");
+  const graph = projectGraph(me ? [...others, me] : others, [...REVIEWED, ...mine], (s) => s.titles?.intent ?? s.intent ?? s.problem ?? "Unknown");
   return { graph, mine };
 }
 

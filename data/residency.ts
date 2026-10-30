@@ -5,7 +5,7 @@
 
 import type { Art } from "./mira";
 import type { Person } from "./social";
-import { CONNECTION_LABEL, condense, isConnection, personId, type Connection, type Graph, type Snapshot } from "@/contract/residency";
+import { CONNECTION_LABEL, condense, personId, type Connection, type Snapshot } from "@/contract/residency";
 
 export { QUESTIONS } from "@/contract/residency";
 
@@ -51,12 +51,12 @@ export interface WNode {
 const ARTS: Art[] = ["meadow", "hills", "water", "park", "dusk"];
 const artOf = (s: string) => ARTS[[...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % ARTS.length];
 // The first few words, ending on a word that carries meaning: "Run an AI tutor", not "Run an AI".
-const title = (s: string, n = 4) => {
+export const title = (s: string, n = 4) => {
   const w = condense(s, n).replace(/…$/, "").replace(/[,.;:?!]+$/, "").split(" ");
   while (w.length > 2 && /^(of|a|an|the|and|to|in|for|on|with|that|my|our|is|are)$/i.test(w[w.length - 1])) w.pop();
   return w.join(" ");
 };
-const faceOf = (resident: string) => residentById(resident)?.face.art;
+export { artOf };
 
 // Yours: you, your intent and problem, the approaches around them, and the residents Force
 // connected you with, each hanging off what you share.
@@ -97,20 +97,6 @@ export function youWorld(s: Snapshot | null, name: string, mine: Connection[] = 
 
 // The cohort: every resident who approved and shared, their intents, the themes between
 // them, and the connections. Built only from what GET /api/residency/graph returns.
-export function cohortWorld(g: Graph, me: string): { nodes: WNode[]; edges: [string, string][] } {
-  const nodes: WNode[] = g.nodes.map((n) =>
-    n.type === "person"
-      ? { id: n.id, kind: n.resident_id === me ? "you" : "person", title: n.resident_id === me ? "You" : n.label, label: n.label, art: n.resident_id === me ? ME_FACE.art : (faceOf(n.resident_id!) ?? artOf(n.id)), person: n.resident_id }
-      : n.type === "intent_problem"
-        ? { id: n.id, kind: "intent", title: title(n.label), label: n.label, line: n.resident_id === me ? "What you want to make progress on." : `What ${residentById(n.resident_id!)?.name ?? "they"} want${residentById(n.resident_id!) ? "s" : ""} to make progress on.`, art: n.resident_id === me ? "meadow" : (faceOf(n.resident_id!) ?? artOf(n.id)), person: n.resident_id }
-        : { id: n.id, kind: "theme", title: n.label, label: n.label, line: "A theme or approach.", art: artOf(n.label) },
-  );
-  const edges: [string, string][] = g.edges.map((e) => [e.source, e.target]);
-  return { nodes, edges };
-}
-
-export const connectionsIn = (g: Graph) => g.edges.filter(isConnection);
-
 // The residency. Faces are painting crops until the real photos come in. What each resident
 // is working on comes from their approved snapshot; this is only how they look and talk.
 export interface Resident extends Person {

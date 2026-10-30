@@ -83,6 +83,9 @@
           ]
         },
         "fixture": true
+      },
+      "titles": {
+        "intent": "Farmer credit interviews"
       }
     },
     {
@@ -167,6 +170,9 @@
           ]
         },
         "fixture": true
+      },
+      "titles": {
+        "intent": "Sensors in village tanks"
       }
     },
     {
@@ -250,6 +256,9 @@
           ]
         },
         "fixture": true
+      },
+      "titles": {
+        "intent": "A book on old markets"
       }
     },
     {
@@ -334,6 +343,9 @@
           ]
         },
         "fixture": true
+      },
+      "titles": {
+        "intent": "AI tutor pilot"
       }
     },
     {
@@ -417,6 +429,9 @@
           ]
         },
         "fixture": true
+      },
+      "titles": {
+        "intent": "Letter-writers documentary"
       }
     },
     {
@@ -482,6 +497,9 @@
           ]
         },
         "fixture": true
+      },
+      "titles": {
+        "intent": "Open map of markets"
       }
     }
   ],

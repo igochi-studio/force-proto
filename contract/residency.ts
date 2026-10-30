@@ -331,8 +331,10 @@ export function synthesize(i: SynthInput, now = new Date()): Snapshot {
 
 // ── Graph (§3, §4) ──
 
-export type NodeType = "person" | "intent_problem" | "theme_approach";
-export type StructuralEdge = "person_has_intent" | "intent_has_theme";
+// archetype: the Onairos archetype a person chose to show, shared by everyone who has it.
+// Optional for a backend: a graph without archetype nodes still draws.
+export type NodeType = "person" | "intent_problem" | "theme_approach" | "archetype";
+export type StructuralEdge = "person_has_intent" | "intent_has_theme" | "person_has_archetype";
 export type ConnectionType = "shared_problem" | "complementary_approach" | "shared_exploration" | "potential_contribution";
 
 // Short badges for people cards, Gigi-style, each with its colour.
@@ -355,7 +357,11 @@ export interface GraphNode {
   type: NodeType;
   label: string;
   resident_id?: string; // person nodes, and whose intent an intent_problem node is
+  detail?: string; // intent_problem: the whole sentence, when the label is its short title
 }
+
+// "The Patient Listener" and "Patient Listener" are one archetype.
+export const archetypeName = (a: string) => a.trim().replace(/^the\s+/i, "");
 
 export interface Evidence {
   snapshot_id: string;
@@ -396,18 +402,26 @@ export const validConnection = (c: Connection, ids: Set<string>) =>
 
 // GET /api/residency/graph: cohort-visible nodes and edges, from approved and shared
 // snapshots only. A connection touching anyone not visible is dropped, not hidden.
-export function projectGraph(snapshots: Snapshot[], connections: Connection[], titleOf: (s: Snapshot) => string = (s) => s.intent ?? "Unknown"): Graph {
+export function projectGraph(snapshots: Snapshot[], connections: Connection[], titleOf: (s: Snapshot) => string = (s) => s.titles?.intent ?? s.intent ?? "Unknown"): Graph {
   const shown = snapshots.filter(visible);
   const ids = new Set(shown.map((s) => s.id));
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
   const themes = new Map<string, GraphNode>();
+  const archetypes = new Map<string, GraphNode>();
   for (const s of shown) {
     const pid = personId(s.resident_id);
     nodes.push({ id: pid, type: "person", label: s.name, resident_id: s.resident_id });
+    // Only there when they chose to show how they come across (persona is stripped otherwise).
+    if (s.persona?.archetype) {
+      const name = archetypeName(s.persona.archetype);
+      const aid = `archetype_${slug(name)}`;
+      if (!archetypes.has(aid)) archetypes.set(aid, { id: aid, type: "archetype", label: name });
+      edges.push({ source: pid, target: aid, type: "person_has_archetype" });
+    }
     if (!s.intent && !s.problem) continue;
     const iid = `intent_${s.resident_id}`;
-    nodes.push({ id: iid, type: "intent_problem", label: titleOf(s), resident_id: s.resident_id });
+    nodes.push({ id: iid, type: "intent_problem", label: titleOf(s), detail: s.intent ?? s.problem ?? undefined, resident_id: s.resident_id });
     edges.push({ source: pid, target: iid, type: "person_has_intent" });
     for (const a of s.approach) {
       const tid = `theme_${slug(a)}`;
@@ -415,7 +429,7 @@ export function projectGraph(snapshots: Snapshot[], connections: Connection[], t
       edges.push({ source: iid, target: tid, type: "intent_has_theme" });
     }
   }
-  nodes.push(...themes.values());
+  nodes.push(...themes.values(), ...archetypes.values());
   for (const c of connections) if (validConnection(c, ids)) edges.push(c);
   return { nodes, edges };
 }
