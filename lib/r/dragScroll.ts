@@ -3,11 +3,12 @@
 // Lets a mouse drag a sideways row, the way a finger already can. Desktop browsers only
 // scroll a row by wheel or trackpad, so on the phone frame "swipe" did nothing. Touch and
 // pen keep the browser's own scrolling. A drag lands on a card (the nearest, or the next one
-// over after a flick), and the click at the end of a drag doesn't press anything.
+// over after a flick) unless snap is off, and the click at the end of a drag doesn't press
+// anything.
 
 import { useEffect, useRef } from "react";
 
-export function useDragScroll<T extends HTMLElement>() {
+export function useDragScroll<T extends HTMLElement>({ snap = true }: { snap?: boolean } = {}) {
   const ref = useRef<T>(null);
   useEffect(() => {
     const el = ref.current;
@@ -50,6 +51,7 @@ export function useDragScroll<T extends HTMLElement>() {
       setTimeout(() => (moved = false), 0); // after the click this pointerup makes, if any
       el.style.userSelect = "";
       document.body.style.cursor = "";
+      if (!snap) return void (el.style.scrollSnapType = "");
       const cards = Array.from(el.children).filter((c) => (c as HTMLElement).offsetWidth > 0);
       const max = el.scrollWidth - el.clientWidth;
       const at = cards.map(centre);
@@ -93,6 +95,6 @@ export function useDragScroll<T extends HTMLElement>() {
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
     };
-  }, []);
+  }, [snap]);
   return ref;
 }

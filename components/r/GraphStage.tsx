@@ -5,27 +5,31 @@
 // each, what they want to change (intent); at the bottom, the approaches they work through.
 // Archetypes and approaches are shared, so they're the buckets people fall into. Force's
 // connections run between people as arcs: solid once reviewed, dashed while only suggested.
-// Tap anything: it and what it touches stay, the rest fades back. Not part of a resident's
-// flow; it's shown at the end.
+// Tap anything: it and what it touches stay, the rest fades back, and its card docks at the
+// bottom. In the phone, like the rest of the residency. Not part of a resident's flow; it's
+// shown at the end.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CONNECTION_BADGE, CONNECTION_LABEL, archetypeName, type Connection, type Snapshot } from "@/contract/residency";
 import { ME_FACE, artOf, residentById, title } from "@/data/residency";
 import { useR } from "@/lib/f/residency";
 import { COHORT } from "@/lib/r/api";
 import { useCohort } from "@/lib/r/cohort";
+import { useDragScroll } from "@/lib/r/dragScroll";
 import { around, layoutGraph, type Layout, type Placed, type Row } from "@/lib/r/graphLayout";
 import Glass from "../f/Glass";
+import { BlurTop } from "../f/Nav";
 import { I, Logo, haptic } from "../f/ui";
 
 const names = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}` : (xs[0] ?? ""));
 const short = (s: string) => (s.split(/\s+/).length > 5 ? title(s, 5) : s);
 const NAMES: Record<Row, string> = { archetype: "Archetype", person: "People", intent: "Intent", theme: "Approach" };
 
-// Rows, top to bottom, with the room between them; the gaps grow on a tall screen.
-const BASE = { top: 40, archToPerson: 150, personToIntent: 108, intentToTheme: 132, bottom: 48 };
-const ORB = 56;
-const INTENT_H = 56;
+// Rows, top to bottom, with the room between them.
+const Y: Record<Row, number> = { archetype: 32, person: 140, intent: 236, theme: 336 };
+const HEIGHT = 372;
+const ORB = 52;
+const INTENT_H = 52;
 const PILL_H = 32;
 
 let ruler: CanvasRenderingContext2D | null = null;
@@ -36,53 +40,44 @@ const textWidth = (s: string) => {
   return ruler.measureText(s).width;
 };
 
+// Where a line leaves a node (below it) and arrives (above it).
+const below = (p: Placed) => Y[p.row] + (p.row === "person" ? ORB / 2 + 22 : p.row === "intent" ? INTENT_H / 2 : PILL_H / 2);
+const above = (p: Placed) => Y[p.row] - (p.row === "person" ? ORB / 2 : p.row === "intent" ? INTENT_H / 2 : PILL_H / 2);
+
 export default function GraphStage() {
   const { graph } = useCohort();
   const me = useR((s) => s.me);
   const mine = useR((s) => s.snapshot);
-  const box = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ w: 0, h: 0 });
+  // The graph is wider than the phone: it scrolls sideways, by finger, trackpad or mouse.
+  const box = useDragScroll<HTMLDivElement>({ snap: false });
+  const [w, setW] = useState(0);
   const [focus, setFocus] = useState<string | null>(null);
 
   useEffect(() => {
     const el = box.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
+    const ro = new ResizeObserver(() => setW(el.clientWidth));
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [box]);
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === "Escape" && setFocus(null);
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
   }, []);
 
-  const narrow = size.w < 640;
   const l = useMemo(
     () =>
-      size.w
-        ? layoutGraph(graph, size.w, {
-            slot: narrow ? 112 : 148,
-            pad: narrow ? 88 : 104, // room for the row names at the left
-            gap: 12,
-            pill: (row, label) => textWidth(label) + (row === "archetype" ? 4 + 24 + 6 + 12 : 24) + 20,
+      w
+        ? layoutGraph(graph, w, {
+            slot: 120,
+            pad: 84, // room for the row names at the left
+            gap: 10,
+            pill: (row, label) => textWidth(label) + (row === "archetype" ? 4 + 22 + 6 + 12 : 24) + 20,
           })
         : null,
-    [graph, size.w, narrow],
+    [graph, w],
   );
-
-  const base = BASE.top + BASE.archToPerson + BASE.personToIntent + BASE.intentToTheme + BASE.bottom;
-  const k = Math.min(1.5, Math.max(1, size.h / base));
-  const Y: Record<Row, number> = {
-    archetype: BASE.top,
-    person: BASE.top + BASE.archToPerson * k,
-    intent: BASE.top + (BASE.archToPerson + BASE.personToIntent) * k,
-    theme: BASE.top + (BASE.archToPerson + BASE.personToIntent + BASE.intentToTheme) * k,
-  };
-  const height = Y.theme + BASE.bottom;
-  // Where a line leaves a node (below it) and arrives (above it).
-  const below = (p: Placed) => Y[p.row] + (p.row === "person" ? ORB / 2 + 24 : p.row === "intent" ? INTENT_H / 2 : PILL_H / 2);
-  const above = (p: Placed) => Y[p.row] - (p.row === "person" ? ORB / 2 : p.row === "intent" ? INTENT_H / 2 : PILL_H / 2);
 
   const snapOf = (rid?: string): Snapshot | undefined => (rid === me && mine ? mine : COHORT.find((s) => s.resident_id === rid));
   const nameOf = (pid: string) => {
@@ -99,55 +94,45 @@ export default function GraphStage() {
   const count = (t: string) => graph.nodes.filter((n) => n.type === t).length;
   const links = l?.links ?? [];
 
+  // Picking something brings it into view: sideways in the graph, and the page up to it.
+  const pick = (id: string | null) => {
+    setFocus(id);
+    const p = id && l?.placed.get(id);
+    const el = box.current;
+    if (!p || !el) return;
+    el.scrollTo({ left: p.x - el.clientWidth / 2, behavior: "smooth" });
+    el.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
+  const card =
+    strength && strengths.has(strength) ? (
+      <Panel kind="Strength in common" head={strength} onClose={() => setFocus(null)} rows={[["Who", names(strengths.get(strength)!.map(nameOf))], ["Where it's from", "Onairos, by name only, for people who chose to show how they come across. Never a number."]]} />
+    ) : focus && l?.placed.get(focus) ? (
+      <Card l={l} id={focus} me={me} snapOf={snapOf} nameOf={nameOf} strengths={strengths} onClose={() => setFocus(null)} onPick={pick} />
+    ) : null;
+
   return (
-    <div className="flex min-h-dvh flex-col bg-canvas lg:h-dvh">
-      <header className="flex flex-wrap items-end justify-between gap-4 px-6 pb-3 pt-6 sm:px-10 sm:pt-8">
-        <div>
+    <div className="absolute inset-0 flex flex-col overflow-hidden bg-canvas" style={{ paddingTop: "var(--sat)", paddingBottom: "var(--sab)" }}>
+      {/* What scrolls up under the status bar blurs away */}
+      <BlurTop height={20} />
+      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto pb-10 pt-3" style={{ paddingBottom: card ? 320 : undefined }}>
+        <header className="px-4">
           <p className="flex items-center gap-2 t-label text-ink-3">
             <Glass size={22} art="dusk" x={40} y={40} zoom={300}>
               <Logo size={10} />
             </Glass>
             Force · Dhun residency
           </p>
-          <h1 className="mt-2 t-large text-ink">Everyone, by what they&apos;re trying to make happen</h1>
-        </div>
-        <dl className="flex flex-wrap gap-x-6 gap-y-2">
-          {[
-            ["People", count("person")],
-            ["Archetypes", count("archetype")],
-            ["Intents", count("intent_problem")],
-            ["Approaches", count("theme_approach")],
-            ["Connections", links.length],
-          ].map(([key, v]) => (
-            <div key={key as string}>
-              <dt className="t-meta text-ink-3">{key}</dt>
-              <dd className="t-title text-ink">{v}</dd>
-            </div>
-          ))}
-        </dl>
-      </header>
-      <ul className="flex flex-wrap items-center gap-x-5 gap-y-1 px-6 pb-2 t-label text-ink-2 sm:px-10" aria-label="How to read it">
-        <li className="flex items-center gap-2">
-          <svg width="28" height="10" aria-hidden>
-            <path d="M2 8 Q14 -2 26 8" fill="none" stroke="var(--sage-4)" strokeWidth="2" />
-          </svg>
-          Connection, reviewed
-        </li>
-        <li className="flex items-center gap-2">
-          <svg width="28" height="10" aria-hidden>
-            <path d="M2 8 Q14 -2 26 8" fill="none" stroke="var(--sage-4)" strokeWidth="2" strokeDasharray="4 4" />
-          </svg>
-          Suggested by Force
-        </li>
-        <li className="text-ink-3">Tap anything</li>
-      </ul>
+          <h1 className="mt-2 t-title text-ink">Who&apos;s here</h1>
+          <p className="mt-1 t-label text-ink-2">
+            {count("person")} {count("person") === 1 ? "person" : "people"}, grouped by what they want and how they work. A line between two people means Force thinks they should meet.
+          </p>
+        </header>
 
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        <div ref={box} className="no-scrollbar relative h-[580px] shrink-0 overflow-auto lg:h-auto lg:min-h-0 lg:flex-1" onClick={() => setFocus(null)}>
+        <div ref={box} className="no-scrollbar relative mt-2 overflow-x-auto overflow-y-hidden" style={{ height: HEIGHT }} onClick={() => setFocus(null)}>
           {l && l.people.length === 0 && <p className="absolute inset-0 grid place-items-center t-body text-ink-3">No one has approved and shared yet.</p>}
           {l && l.people.length > 0 && (
-            <div className="relative" style={{ width: l.width, height }}>
-              <svg className="pointer-events-none absolute inset-0" width={l.width} height={height} aria-hidden>
+            <div className="relative" style={{ width: l.width, height: HEIGHT }}>
+              <svg className="pointer-events-none absolute inset-0" width={l.width} height={HEIGHT} aria-hidden>
                 {l.lines.map(({ a, b }) => {
                   const p = l.placed.get(a)!;
                   const q = l.placed.get(b)!;
@@ -161,7 +146,7 @@ export default function GraphStage() {
                   const p = l.placed.get(c.source)!;
                   const q = l.placed.get(c.target)!;
                   const y = Y.person - ORB / 2 - 2;
-                  const lift = Math.min(BASE.archToPerson * k - PILL_H, 28 + Math.abs(q.x - p.x) * 0.2);
+                  const lift = Math.min(Y.person - Y.archetype - ORB / 2 - PILL_H, 24 + Math.abs(q.x - p.x) * 0.18);
                   const on = !lit || (lit.has(c.source) && lit.has(c.target));
                   return (
                     <path key={c.id} d={`M${p.x} ${y} Q${(p.x + q.x) / 2} ${y - lift * 2} ${q.x} ${y}`} fill="none" stroke={`var(--${CONNECTION_BADGE[c.type].hue}-4)`} strokeWidth={2.25} strokeLinecap="round" strokeDasharray={c.origin === "reviewed" ? undefined : "5 5"} opacity={on ? 1 : 0.15} style={{ transition: "opacity 150ms" }} />
@@ -175,22 +160,21 @@ export default function GraphStage() {
                 </span>
               ))}
               {[...l.placed.values()].map((p) => (
-                <Node key={p.n.id} p={p} y={Y[p.row]} me={p.n.resident_id === me} faded={!!lit && !lit.has(p.n.id)} picked={focus === p.n.id} n={l.members.get(p.n.id)?.length ?? 0} onTap={() => (haptic(), setFocus(focus === p.n.id ? null : p.n.id))} />
+                <Node key={p.n.id} p={p} y={Y[p.row]} me={p.n.resident_id === me} faded={!!lit && !lit.has(p.n.id)} picked={focus === p.n.id} n={l.members.get(p.n.id)?.length ?? 0} onTap={() => (haptic(), focus === p.n.id ? setFocus(null) : pick(p.n.id))} />
               ))}
             </div>
           )}
         </div>
 
-        <aside className="shrink-0 border-[var(--fill)] px-6 pb-8 pt-4 sm:px-10 lg:w-[360px] lg:overflow-y-auto lg:border-l lg:px-6 lg:pt-2">
-          {strength && strengths.has(strength) ? (
-            <Panel kind="Strength in common" head={strength} onClose={() => setFocus(null)} rows={[["Who", names(strengths.get(strength)!.map(nameOf))], ["Where it's from", "Onairos, by name only, for people who chose to show how they come across. Never a number."]]} />
-          ) : focus && l?.placed.get(focus) ? (
-            <Card l={l} id={focus} me={me} snapOf={snapOf} nameOf={nameOf} strengths={strengths} onClose={() => setFocus(null)} onPick={setFocus} />
-          ) : (
-            l && <Groups l={l} nameOf={nameOf} strengths={strengths} onPick={setFocus} />
-          )}
-        </aside>
+        <div className="mt-6 px-4">{l && <Groups l={l} nameOf={nameOf} strengths={strengths} onPick={pick} />}</div>
       </div>
+
+      {/* What's tapped docks at the bottom of the phone, over the lists, under the graph */}
+      {card && (
+        <div className="no-scrollbar absolute inset-x-3 z-[3] max-h-[40%] overflow-y-auto rounded-[24px]" style={{ bottom: "calc(var(--sab) + 12px)" }}>
+          {card}
+        </div>
+      )}
     </div>
   );
 }
@@ -217,7 +201,7 @@ function Node({ p, y, me, faded, picked, n, onTap }: { p: Placed; y: number; me:
   const arch = p.row === "archetype";
   return (
     <button type="button" onClick={tap} aria-pressed={picked} aria-label={`${arch ? "Archetype" : "Approach"}: ${p.n.label}, ${n} ${n === 1 ? "person" : "people"}`} className={`press absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-[6px] whitespace-nowrap rounded-full ${arch ? "bg-paper pl-1 pr-3" : "bg-paper px-3"}`} style={{ ...style, height: PILL_H, boxShadow: "var(--lift-1)" }}>
-      {arch && <Glass size={24} art={artOf(p.n.label)} x={40} y={45} zoom={320} />}
+      {arch && <Glass size={22} art={artOf(p.n.label)} x={40} y={45} zoom={320} />}
       <span className={`t-label ${arch ? "font-medium text-ink" : "text-ink-2"}`}>{p.n.label}</span>
       {n > 1 && <span className="t-meta text-ink-3">{n}</span>}
     </button>
@@ -239,7 +223,7 @@ function Groups({ l, nameOf, strengths, onPick }: { l: Layout; nameOf: (pid: str
     return (
       <section className="mt-6 first:mt-0">
         <h2 className="t-body font-medium text-ink">{head}</h2>
-        <p className="mt-1 t-label text-ink-3">{hint}</p>
+        {hint && <p className="mt-1 t-label text-ink-3">{hint}</p>}
         <ul className="mt-3 flex flex-col gap-2">
           {xs.map(([id, ps]) => {
             const n = l.placed.get(id)!.n;
@@ -275,12 +259,12 @@ function Groups({ l, nameOf, strengths, onPick }: { l: Layout; nameOf: (pid: str
   };
   return (
     <>
-      {section("Approaches people share", "How they work, from their snapshots.", "theme")}
-      {section("Archetypes", "From Onairos, only for people who chose to show how they come across.", "archetype")}
+      {section("Approaches people share", "", "theme")}
+      {section("Archetypes", "From Onairos.", "archetype")}
       {strengths.size > 0 && (
         <section className="mt-6">
           <h2 className="t-body font-medium text-ink">Strengths in common</h2>
-          <p className="mt-1 t-label text-ink-3">From Onairos, by name. Never a number.</p>
+          <p className="mt-1 t-label text-ink-3">From Onairos.</p>
           <ul className="mt-3 flex flex-col gap-2">
             {[...strengths].map(([name, ps]) => (
               <li key={name}>
@@ -312,15 +296,14 @@ function Card({ l, id, me, snapOf, nameOf, strengths, onClose, onPick }: { l: La
   if (p.row === "person") {
     const s = snapOf(n.resident_id);
     const who = residentById(n.resident_id ?? "");
-    head = n.resident_id === me ? "You" : `${n.label}${who ? ` · ${who.work}` : ""}`;
-    kind = "Person";
+    head = n.resident_id === me ? "You" : n.label;
+    kind = who?.work ?? "Person";
     if (s?.intent || s?.problem) rows.push(["Wants to", s.intent ?? s.problem]);
-    if (s?.approach.length) rows.push(["Approach", s.approach.join(" · ")]);
-    if (s?.persona?.archetype) rows.push(["Archetype", `The ${archetypeName(s.persona.archetype)}${s.persona.positive.length ? ` · strongest in ${names(s.persona.positive.slice(0, 3).map((x) => x.name.toLowerCase()))}` : ""}`]);
+    if (s?.persona?.archetype) rows.push(["Archetype", `The ${archetypeName(s.persona.archetype)}`]);
     // Who they have a strength in common with, by name.
-    const alike = new Map<string, string[]>();
-    for (const [name, ps] of strengths) if (ps.includes(id)) for (const q of ps) if (q !== id) alike.set(q, [...(alike.get(q) ?? []), name.toLowerCase()]);
-    if (alike.size) rows.push(["Strengths in common", names([...alike].map(([q, xs]) => `${nameOf(q)} (${names(xs)})`))]);
+    const alike = new Set<string>();
+    for (const [, ps] of strengths) if (ps.includes(id)) for (const q of ps) if (q !== id) alike.add(q);
+    if (alike.size) rows.push(["Similar strengths", names([...alike].map(nameOf))]);
     const theirs = l.links.filter((c) => c.source === id || c.target === id);
     rows.push(["Connected", theirs.length ? <Links key="c" cs={theirs} self={id} nameOf={nameOf} onPick={onPick} /> : "No clear reason to connect yet."]);
   } else if (p.row === "intent") {
